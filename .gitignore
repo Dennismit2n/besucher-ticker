@@ -1,0 +1,29 @@
+# Betriebssystem
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editoren
+.vscode/
+.idea/
+*.swp
+
+# Python
+__pycache__/
+*.pyc
+
+# ── Laufzeit-Dateien: legt die App selbst neben sich an ──
+# config.json enthaelt das API-Token — die darf NIE ins Repo.
+config.json
+config.json.tmp
+.besucher.lock
+build-protokoll.txt
+
+# ── PyInstaller ──
+build/
+dist/
+*.spec
+
+# ── Sicherheitsnetz: keine Binaerdateien ins Repo (Releases statt Repo) ──
+*.exe
+*.zip

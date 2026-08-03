@@ -1,0 +1,86 @@
+Besucher-Ticker v1.0
+====================
+Overlay fuer die eigenen GoatCounter-Zahlen. Schwarz, pinke Schrift,
+blaue Balken.
+
+Voraussetzung: eine eigene Webseite, die mit GoatCounter zaehlt
+(https://www.goatcounter.com). Der Ticker zaehlt selbst nichts —
+er zeigt an, was dein GoatCounter-Konto schon weiss.
+
+
+ERSTER START — in drei Schritten
+--------------------------------
+
+1. API-Token anlegen
+   Auf der eigenen GoatCounter-Seite anmelden (deinname.goatcounter.com),
+   oben rechts auf den Benutzernamen klicken, dann "API" waehlen und
+   "Add new token". Name frei waehlbar. Es genuegt das Haeckchen bei
+   "Read statistics" — mehr Rechte braucht der Ticker nicht, und
+   weniger Rechte koennen auch weniger Schaden anrichten, falls das
+   Token je abhanden kommt.
+
+2. Ticker starten
+   Doppelklick auf BesucherTicker.exe (oder: python besucher_ticker.py).
+   Beim allerersten Start fragt er zwei Dinge: die Adresse der
+   GoatCounter-Seite ("deinname" genuegt) und danach das Token.
+   Beides landet in der config.json neben dem Programm — das Token
+   verschluesselt, gebunden an dieses Benutzerkonto und diesen Rechner.
+
+3. Fenster zurechtruecken
+   Das Overlay laesst sich mit der Maus ziehen. Ist es verschwunden
+   (z. B. nach abgezogenem zweitem Monitor): Rechtsklick aufs Symbol
+   im Infobereich der Taskleiste, dann "Overlay zur Mitte holen".
+
+
+BEDIENUNG
+---------
+
+Doppelklick aufs Overlay   Mini-/Maxi-Modus umschalten
+Ziehen mit der Maus        verschieben (Position wird gemerkt)
+Rechtsklick aufs Tray-Symbol:
+   Overlay an/aus, Overlay zur Mitte holen, Jetzt aktualisieren,
+   Zeitraum (heute / 7 Tage / 30 Tage / gesamt),
+   Zusatzblock (aus / Laender / Verweise),
+   Einstellungen, Naechstes Theme, Zugang aendern, Beenden
+
+
+WAS DIE ZAHLEN BEDEUTEN
+-----------------------
+
+GoatCounter kennt zwei verschiedene Groessen, und der Ticker mischt
+sie bewusst nicht:
+
+   Die grosse Zahl oben = AUFRUFE im gewaehlten Zeitraum
+   Die Balken           = BESUCHER je Seite
+
+Rechts daneben stehen zusaetzlich der heutige Wert und die Gesamtsumme.
+
+Deshalb ergibt die Summe der Balken NICHT die grosse Zahl. Das ist
+kein Rechenfehler, sondern der Unterschied zwischen "wie oft wurde
+etwas geoeffnet" und "wie viele Leute waren da".
+
+Klick-Ereignisse (data-count-Events von GoatCounter) tragen in der
+API ein eigenes Kennzeichen und werden aus den Balken herausgefiltert.
+Ohne das wuerde ein einziger Klick zweimal zaehlen: einmal als
+Seitenaufruf, einmal als Ereignis.
+
+"Gesamt" wird hoechstens alle 10 Minuten neu geholt — die Zahl aendert
+sich ohnehin traege, und jede Abfrage kostet eine Anfrage.
+
+
+NEU BAUEN
+---------
+
+Doppelklick auf exe-neu-bauen.cmd. Das Skript prueft vorher, ob der
+Ticker noch laeuft (dann liesse sich die Exe nicht ueberschreiben) und
+laesst den Selbsttest durchlaufen. Die Exe MUSS neben der config.json
+liegen, sonst findet sie das Token nicht.
+
+Selbsttest einzeln:  python besucher_ticker.py --selbsttest
+
+
+BENOETIGTE PAKETE
+-----------------
+
+   pip install requests pystray pillow
+   pip install pywin32      (optional, verschluesselt das Token)
