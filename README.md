@@ -20,13 +20,13 @@ A website of your own that counts with GoatCounter. The ticker does not count an
 
 | | |
 |---|---|
-| **Pageviews** | the big number: pageviews for the chosen period (today / 7 days / 30 days / all time), with today's and the all-time value beside it |
+| **Pageviews** | the big number: pageviews for the chosen period (today / 7 days / 30 days / all time), with today’s and the all-time value beside it |
 | **Bars** | visitors per page — subpages are folded into their page instead of appearing separately |
 | **Extra block** | countries or referrers, or off |
 
 **The bars do not add up to the big number — on purpose.** GoatCounter tracks two different quantities: *pageviews* (how often something was opened) and *visitors* (how many people came). The ticker does not mix them, and the labels keep them apart.
 
-Click events (GoatCounter's `data-count` events) are filtered out of the bars. Otherwise a single click would count twice: once as a pageview and once as an event.
+Click events (GoatCounter’s `data-count` events) are filtered out of the bars. Otherwise a single click would count twice: once as a pageview and once as an event.
 
 ## Getting started
 
