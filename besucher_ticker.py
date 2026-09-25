@@ -1059,6 +1059,10 @@ class TickerApp:
         tk.Button(win, text="Schließen", command=win.destroy).grid(
             row=17, column=0, columnspan=2, pady=(12, 0))
 
+        tk.Label(win, text="© 2026 Dennis_mit_2n", fg=t["muted"], bg=t["bg"],
+                 font=("Segoe UI", 8)).grid(
+            row=18, column=0, columnspan=2, pady=(6, 0))
+
         def on_close():
             self.settings_win = None
             win.destroy()
