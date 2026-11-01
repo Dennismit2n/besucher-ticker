@@ -1,5 +1,5 @@
 """
-Besucher-Ticker v1.1.5 · GoatCounter-Overlay + System-Tray (Windows)
+Besucher-Ticker v1.1.6 · GoatCounter-Overlay + System-Tray (Windows)
 ==================================================================
 Zeigt die Besucherzahlen der eigenen GoatCounter-Seite live als
 schwebendes, halbtransparentes Overlay. An/Aus über das Tray-Icon.
@@ -63,7 +63,7 @@ import sys
 import threading
 import time
 import tkinter as tk
-from tkinter import messagebox, simpledialog, ttk
+from tkinter import simpledialog, ttk
 import tkinter.font as tkfont
 from datetime import datetime, timedelta, timezone
 
@@ -100,7 +100,7 @@ LOCK_PATH = os.path.join(_BASE_DIR, ".besucher.lock")
 RETRY_BACKOFF = (10, 30, 60)          # Sekunden nach normalen Fehlern
 RATE_LIMIT_BACKOFF = (30, 120, 300)   # nach HTTP 429
 RATE_LIMIT_MAX_WAIT = 3600
-UA = "BesucherTicker/1.1.5 (personal read-only GoatCounter display)"
+UA = "BesucherTicker/1.1.6 (personal read-only GoatCounter display)"
 
 BAR_W, BAR_H = 190, 8
 
@@ -1267,6 +1267,31 @@ class Eingabe(simpledialog.Dialog):
         self.result = self.feld.get()
 
 
+class Hinweis(simpledialog.Dialog):
+    """Dunkler Hinweis mit einem Knopf, statt messagebox.showinfo (der Windows-Dialog bleibt hell)."""
+
+    def __init__(self, parent: tk.Misc, titel: str, text: str, farben: dict | None = None):
+        self.text = text
+        self.t = farben or THEMES[DEFAULT_THEME]
+        super().__init__(parent, titel)
+
+    def body(self, master):
+        t = self.t
+        self.configure(bg=t["bg"])
+        master.configure(bg=t["bg"])
+        titelleiste_dunkel(self)
+        tk.Label(master, text=self.text, justify=tk.LEFT, wraplength=360, fg=t["text"],
+                 bg=t["bg"]).grid(row=0, padx=8, pady=(6, 0), sticky=tk.W)
+
+    def buttonbox(self):
+        box = tk.Frame(self, bg=self.t["bg"])
+        tk.Button(box, text=tx("ok"), command=self.ok, default=tk.ACTIVE, width=10,
+                  **knopf_farben(self.t)).pack(padx=5, pady=8)
+        self.bind("<Return>", self.ok)
+        self.bind("<Escape>", self.cancel)
+        box.pack()
+
+
 def ask_site(parent: tk.Tk | None = None, vorgabe: str = "",
              farben: dict | None = None) -> str | None:
     own_root = False
@@ -2347,8 +2372,10 @@ if __name__ == "__main__":
     if not acquire_single_instance():
         _r = tk.Tk()
         _r.withdraw()
-        SPRACHE = waehle_sprache(load_config())
-        messagebox.showinfo("Besucher-Ticker", tx("laeuftBereits"))
+        _cfg = load_config()
+        SPRACHE = waehle_sprache(_cfg)
+        Hinweis(_r, "Besucher-Ticker", tx("laeuftBereits"),
+                THEMES.get(_cfg.get("theme"), THEMES[DEFAULT_THEME]))
         _r.destroy()
         sys.exit(0)
     try:
