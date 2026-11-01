@@ -1,5 +1,5 @@
 """
-Besucher-Ticker v1.1.2 · GoatCounter-Overlay + System-Tray (Windows)
+Besucher-Ticker v1.1.3 · GoatCounter-Overlay + System-Tray (Windows)
 ==================================================================
 Zeigt die Besucherzahlen der eigenen GoatCounter-Seite live als
 schwebendes, halbtransparentes Overlay. An/Aus über das Tray-Icon.
@@ -100,7 +100,7 @@ LOCK_PATH = os.path.join(_BASE_DIR, ".besucher.lock")
 RETRY_BACKOFF = (10, 30, 60)          # Sekunden nach normalen Fehlern
 RATE_LIMIT_BACKOFF = (30, 120, 300)   # nach HTTP 429
 RATE_LIMIT_MAX_WAIT = 3600
-UA = "BesucherTicker/1.1.2 (personal read-only GoatCounter display)"
+UA = "BesucherTicker/1.1.3 (personal read-only GoatCounter display)"
 
 BAR_W, BAR_H = 190, 8
 
@@ -1203,55 +1203,82 @@ def normalisiere_site(eingabe: str) -> str:
 
 
 class Eingabe(simpledialog.Dialog):
-    """Wie simpledialog.askstring, aber die Knöpfe sprechen die eingestellte Sprache
-    (Pythons eigener Dialog beschriftet fest mit "OK" und "Cancel")."""
+    """Wie simpledialog.askstring, aber dunkel in den Farben des Tickers und mit Knöpfen
+    in der eingestellten Sprache (Pythons eigener Dialog ist hellgrau und beschriftet
+    fest mit "OK" und "Cancel")."""
 
-    def __init__(self, parent: tk.Misc, titel: str, frage: str, vorgabe: str = ""):
+    def __init__(self, parent: tk.Misc, titel: str, frage: str, vorgabe: str = "",
+                 farben: dict | None = None):
         self.frage = frage
         self.vorgabe = vorgabe
+        self.t = farben or THEMES[DEFAULT_THEME]
         super().__init__(parent, titel)
 
     def body(self, master):
-        tk.Label(master, text=self.frage, justify=tk.LEFT).grid(row=0, padx=5, sticky=tk.W)
-        self.feld = tk.Entry(master, name="entry")
-        self.feld.grid(row=1, padx=5, sticky=tk.W + tk.E)
+        t = self.t
+        self.configure(bg=t["bg"])
+        master.configure(bg=t["bg"])
+        self.bind("<Map>", self._titelleiste_dunkel, add="+")
+        tk.Label(master, text=self.frage, justify=tk.LEFT, fg=t["text"], bg=t["bg"]).grid(row=0, padx=5, sticky=tk.W)
+        self.feld = tk.Entry(master, name="entry", bg=t["bar_bg"], fg=t["text"], insertbackground=t["title"],
+                             selectbackground=t["bar"], selectforeground="#ffffff", relief=tk.FLAT,
+                             highlightthickness=1, highlightbackground=t["muted"], highlightcolor=t["title"])
+        self.feld.grid(row=1, padx=5, pady=(6, 0), ipady=3, sticky=tk.W + tk.E)
         if self.vorgabe:
             self.feld.insert(0, self.vorgabe)
             self.feld.select_range(0, tk.END)
         return self.feld
 
     def buttonbox(self):
-        box = tk.Frame(self)
-        tk.Button(box, text=tx("ok"), width=10, command=self.ok, default=tk.ACTIVE).pack(side=tk.LEFT, padx=5, pady=5)
-        tk.Button(box, text=tx("abbrechen"), width=10, command=self.cancel).pack(side=tk.LEFT, padx=5, pady=5)
+        t = self.t
+        box = tk.Frame(self, bg=t["bg"])
+        knopf = dict(width=10, bg=t["bar_bg"], fg=t["text"], activebackground=t["bar"],
+                     activeforeground="#ffffff", relief=tk.FLAT, bd=0, highlightthickness=1,
+                     highlightbackground=t["muted"], highlightcolor=t["title"], cursor="hand2")
+        tk.Button(box, text=tx("ok"), command=self.ok, default=tk.ACTIVE, **knopf).pack(side=tk.LEFT, padx=5, pady=8)
+        tk.Button(box, text=tx("abbrechen"), command=self.cancel, **knopf).pack(side=tk.LEFT, padx=5, pady=8)
         self.bind("<Return>", self.ok)
         self.bind("<Escape>", self.cancel)
         box.pack()
+
+    def _titelleiste_dunkel(self, e=None):
+        # Ohne das bleibt die Titelleiste weiß, auch wenn Windows auf dunkel steht.
+        # DWMWA_USE_IMMERSIVE_DARK_MODE = 20 (Windows 10 ab 20H1 und Windows 11).
+        if e is not None and e.widget is not self:
+            return
+        try:
+            import ctypes
+            an = ctypes.c_int(1)
+            ctypes.windll.dwmapi.DwmSetWindowAttribute(int(self.wm_frame(), 16), 20,
+                                                       ctypes.byref(an), ctypes.sizeof(an))
+        except Exception:
+            pass
 
     def apply(self):
         self.result = self.feld.get()
 
 
-def ask_site(parent: tk.Tk | None = None, vorgabe: str = "") -> str | None:
+def ask_site(parent: tk.Tk | None = None, vorgabe: str = "",
+             farben: dict | None = None) -> str | None:
     own_root = False
     if parent is None:
         parent = tk.Tk()
         parent.withdraw()
         own_root = True
-    wert = Eingabe(parent, "Besucher-Ticker", tx("frageSite"), vorgabe).result
+    wert = Eingabe(parent, "Besucher-Ticker", tx("frageSite"), vorgabe, farben).result
     if own_root:
         parent.destroy()
     return normalisiere_site(wert) or None
 
 
-def ask_token(parent: tk.Tk | None = None) -> str | None:
+def ask_token(parent: tk.Tk | None = None, farben: dict | None = None) -> str | None:
     """GUI-Dialog statt input() — funktioniert auch unter pythonw.exe."""
     own_root = False
     if parent is None:
         parent = tk.Tk()
         parent.withdraw()
         own_root = True
-    token = Eingabe(parent, "Besucher-Ticker", tx("frageToken")).result
+    token = Eingabe(parent, "Besucher-Ticker", tx("frageToken"), farben=farben).result
     if own_root:
         parent.destroy()
     if token:
@@ -2160,10 +2187,10 @@ class TickerApp:
         self.root.after(200, self._process_queue)
 
     def _change_zugang_dialog(self):
-        site = ask_site(self.root, self.cfg.get("site", ""))
+        site = ask_site(self.root, self.cfg.get("site", ""), self.th)
         if not site:
             return
-        token = ask_token(self.root)
+        token = ask_token(self.root, self.th)
         if not token:
             return
         self.cfg["site"] = site
