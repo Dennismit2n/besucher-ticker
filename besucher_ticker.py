@@ -1,5 +1,5 @@
 """
-Besucher-Ticker v1.1 — GoatCounter-Overlay + System-Tray (Windows)
+Besucher-Ticker v1.1.1 · GoatCounter-Overlay + System-Tray (Windows)
 ==================================================================
 Zeigt die Besucherzahlen der eigenen GoatCounter-Seite live als
 schwebendes, halbtransparentes Overlay. An/Aus über das Tray-Icon.
@@ -100,7 +100,7 @@ LOCK_PATH = os.path.join(_BASE_DIR, ".besucher.lock")
 RETRY_BACKOFF = (10, 30, 60)          # Sekunden nach normalen Fehlern
 RATE_LIMIT_BACKOFF = (30, 120, 300)   # nach HTTP 429
 RATE_LIMIT_MAX_WAIT = 3600
-UA = "BesucherTicker/1.1 (personal read-only GoatCounter display)"
+UA = "BesucherTicker/1.1.1 (personal read-only GoatCounter display)"
 
 BAR_W, BAR_H = 190, 8
 
