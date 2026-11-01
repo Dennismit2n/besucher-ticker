@@ -2,7 +2,7 @@
 
 **Deine Besucherzahlen im Blick, während du arbeitest.** Eine kleine schwebende Anzeige für Windows, die die Zahlen der eigenen [GoatCounter](https://www.goatcounter.com)-Seite live zeigt: Aufrufe im gewählten Zeitraum, Besucher je Seite als Balken, dazu Länder oder Verweise. Schwarz, pinke Schrift, blaue Balken.
 
-![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-818cf8) ![Voraussetzung](https://img.shields.io/badge/Voraussetzung-eigenes%20GoatCounter--Konto-4338ca) ![Sprache](https://img.shields.io/badge/Sprache-Deutsch-6366f1) ![Lizenz](https://img.shields.io/badge/Lizenz-MIT-a5b4fc)
+![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-818cf8) ![Voraussetzung](https://img.shields.io/badge/Voraussetzung-eigenes%20GoatCounter--Konto-4338ca) ![Sprachen](https://img.shields.io/badge/Sprachen-14-6366f1) ![Lizenz](https://img.shields.io/badge/Lizenz-MIT-a5b4fc)
 
 [English version](README.md)
 
@@ -48,7 +48,7 @@ pythonw besucher_ticker.py
 |---|---|
 | Ziehen | Overlay verschieben — Position wird beim Loslassen gemerkt |
 | Doppelklick | zwischen klein und groß umschalten |
-| Rechtsklick aufs Taskleisten-Symbol | Overlay an/aus, zur Mitte holen, jetzt aktualisieren, Zeitraum, Zusatzblock, Einstellungen, Themes, Zugang ändern, Beenden |
+| Rechtsklick aufs Taskleisten-Symbol | Overlay an/aus, zur Mitte holen, jetzt aktualisieren, Zeitraum, Zusatzblock, Einstellungen, Themes, Zugang ändern, Sprache, Beenden |
 
 Verschwunden? **Zur Mitte holen** im Menü. Das passiert, wenn ein zweiter Bildschirm abgezogen wurde — das Overlay ist randlos und hat keine Titelleiste zum Zurückholen.
 
@@ -60,7 +60,7 @@ Das Token liegt in der `config.json` neben dem Programm — mit `pywin32` per Wi
 
 ## Unter der Haube
 
-Eine Datei, rund 900 Zeilen, drei Fremdpakete (`requests`, `pystray`, `pillow`; `pywin32` optional) — alles andere ist Python-Standardbibliothek.
+Eine Datei, rund 2.300 Zeilen, drei Fremdpakete (`requests`, `pystray`, `pillow`; `pywin32` optional) — alles andere ist Python-Standardbibliothek.
 
 - Ein Durchlauf braucht 3–4 Anfragen, nacheinander. GoatCounter erlaubt 4 je Sekunde — selbst die schnellste Stufe (15 s) bleibt weit darunter, und Sekundenstufen gibt es bewusst nicht.
 - Die Gesamtsumme wird höchstens alle 10 Minuten frisch geholt: Sie ändert sich träge, und jede Abfrage kostet eine Anfrage.

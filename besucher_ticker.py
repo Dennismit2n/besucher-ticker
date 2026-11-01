@@ -1,5 +1,5 @@
 """
-Besucher-Ticker v1.0 — GoatCounter-Overlay + System-Tray (Windows)
+Besucher-Ticker v1.1 — GoatCounter-Overlay + System-Tray (Windows)
 ==================================================================
 Zeigt die Besucherzahlen der eigenen GoatCounter-Seite live als
 schwebendes, halbtransparentes Overlay. An/Aus über das Tray-Icon.
@@ -34,7 +34,7 @@ Bedienung:
     - Doppelklick aufs Overlay: Mini-/Maxi-Modus umschalten
     - Rechtsklick aufs Tray-Icon: Overlay an/aus, zur Mitte holen,
       Jetzt aktualisieren, Zeitraum, Zusatzblock, Einstellungen,
-      Nächstes Theme, Zugang ändern, Beenden
+      Nächstes Theme, Zugang ändern, Sprache, Beenden
 
 Zu den Zahlen — was hier was bedeutet:
     GoatCounter unterscheidet zwei Dinge, und dieser Ticker vermischt
@@ -64,6 +64,7 @@ import threading
 import time
 import tkinter as tk
 from tkinter import messagebox, simpledialog, ttk
+import tkinter.font as tkfont
 from datetime import datetime, timedelta, timezone
 
 try:
@@ -99,7 +100,7 @@ LOCK_PATH = os.path.join(_BASE_DIR, ".besucher.lock")
 RETRY_BACKOFF = (10, 30, 60)          # Sekunden nach normalen Fehlern
 RATE_LIMIT_BACKOFF = (30, 120, 300)   # nach HTTP 429
 RATE_LIMIT_MAX_WAIT = 3600
-UA = "BesucherTicker/1.0 (personal read-only GoatCounter display)"
+UA = "BesucherTicker/1.1 (personal read-only GoatCounter display)"
 
 BAR_W, BAR_H = 190, 8
 
@@ -107,38 +108,30 @@ BAR_W, BAR_H = 190, 8
 # 3–4 Anfragen, die nacheinander laufen — deshalb ist selbst die
 # schnellste Stufe hier unkritisch. Trotzdem keine Sekundenstufen:
 # es gibt keinen Grund, fremde Server im Sekundentakt zu fragen.
-REFRESH_CHOICES = [
-    ("15 s", 15),
-    ("30 s", 30),
-    ("60 s  (Standard)", 60),
-    ("2 min", 120),
-    ("5 min", 300),
-    ("15 min", 900),
-    ("60 min", 3600),
-]
+# Die Beschriftungen entstehen erst bei der Anzeige (refresh_name,
+# dauer_name), damit sie der gewählten Sprache folgen.
+REFRESH_CHOICES = [15, 30, 60, 120, 300, 900, 3600]
 DEFAULT_REFRESH = 60
 
-COMPACT_DURATIONS = [("dauerhaft", None)] + [
-    (f"{s} Sekunden", s) for s in (3, 5, 8, 15, 30, 60)
-]
+COMPACT_DURATIONS = [None, 3, 5, 8, 15, 30, 60]     # None = dauerhaft
 
 ALPHA_MIN, ALPHA_MAX = 20, 100
 
-# Zeiträume für Balken und Zwischensumme: Schlüssel -> (Anzeigename, Tage)
+# Zeiträume für Balken und Zwischensumme: Schlüssel -> (Textschlüssel, Tage)
 # Tage = None bedeutet "alles".
 ZEITRAEUME = [
-    ("heute", "Heute", 0),
-    ("7t", "7 Tage", 7),
-    ("30t", "30 Tage", 30),
-    ("gesamt", "Gesamt", None),
+    ("heute", "zeitHeute", 0),
+    ("7t", "zeit7", 7),
+    ("30t", "zeit30", 30),
+    ("gesamt", "zeitGesamt", None),
 ]
 DEFAULT_ZEITRAUM = "heute"
 
 # Zusatzblock unter den Balken
 ZUSATZ_CHOICES = [
-    ("aus", "aus", None),
-    ("laender", "Länder", "locations"),
-    ("verweise", "Verweise", "toprefs"),
+    ("aus", "zusAus", None),
+    ("laender", "zusLaender", "locations"),
+    ("verweise", "zusVerweise", "toprefs"),
 ]
 DEFAULT_ZUSATZ = "verweise"
 
@@ -174,6 +167,14 @@ THEMES: dict[str, dict] = {
 THEME_NAMES = list(THEMES.keys())
 DEFAULT_THEME = "Schwarz / Pink / Blau"
 
+# Die Theme-Namen sind zugleich Schlüssel in der config.json und bleiben
+# deshalb deutsch. Angezeigt wird der Name in der gewählten Sprache.
+THEME_TEXT = {
+    "Schwarz / Pink / Blau": "themeSPB",
+    "Schwarz / Pink / Eisblau": "themeSPE",
+    "Tiefschwarz / Magenta / Indigo": "themeTMI",
+}
+
 # Pfad -> hübscher Name. Was hier nicht steht, bekommt den Pfad selbst
 # als Beschriftung; das Overlay bleibt damit auch bei neuen Werkzeugen
 # vollständig, nur eben unbeschönigt.
@@ -189,6 +190,833 @@ PFAD_NAMEN = {
     "/fontART-demo": "fontART",
     "/fontart-demo": "fontART",
 }
+
+# ------------------------------ Sprachen ------------------------------------
+# Alle sichtbaren Texte in 14 Sprachen. Gewählt wird im Tray unter
+# "Sprache"; ohne Wahl gilt die Windows-Anzeigesprache, sonst Englisch.
+
+TEXTE: dict[str, dict[str, str]] = {
+    "de": {
+        "_name": "Deutsch",
+        "titel": "Besucher",
+        "lade": "lade…",
+        "aufrufe": "Aufrufe",
+        "heuteN": "{n} heute",
+        "gesamtN": "{n} gesamt",
+        "jeWerkzeug": "Besucher je Werkzeug",
+        "startseite": "Startseite",
+        "zeitHeute": "Heute",
+        "zeit7": "7 Tage",
+        "zeit30": "30 Tage",
+        "zeitGesamt": "Gesamt",
+        "zusAus": "aus",
+        "zusLaender": "Länder",
+        "zusVerweise": "Verweise",
+        "standard": "Standard",
+        "dauerhaft": "dauerhaft",
+        "sekunden": "{n} Sekunden",
+        "themeSPB": "Schwarz / Pink / Blau",
+        "themeSPE": "Schwarz / Pink / Eisblau",
+        "themeTMI": "Tiefschwarz / Magenta / Indigo",
+        "frageSite": "Adresse der GoatCounter-Seite:\n(z. B. dennis-mit-2n  oder  dennis-mit-2n.goatcounter.com)",
+        "frageToken": "API-Token einfügen\n(GoatCounter → Benutzername oben rechts → API →\n\"Add new token\", Recht \"Read statistics\" genügt):",
+        "mOverlay": "Overlay an/aus",
+        "mMitte": "Overlay zur Mitte holen",
+        "mJetzt": "Jetzt aktualisieren",
+        "mZeitraum": "Zeitraum",
+        "mZusatz": "Zusatzblock",
+        "mEinstellungen": "Einstellungen…",
+        "mTheme": "Nächstes Theme",
+        "mZugang": "Zugang ändern",
+        "mSprache": "Sprache",
+        "mBeenden": "Beenden",
+        "setTitel": "Besucher-Ticker — Einstellungen",
+        "setFreq": "Update-Frequenz",
+        "setFreqHinweis": "GoatCounter erlaubt 4 Anfragen je Sekunde —\nselbst 15 s sind unkritisch.",
+        "setZeitraum": "Zeitraum für Balken und Zwischensumme",
+        "setZusatz": "Zusatzblock unter den Balken",
+        "setBalken": "Höchstens so viele Balken",
+        "setAlpha": "Transparenz ({min}–{max} %)",
+        "setMiniMaxi": "Mini-/Maxi-Modus",
+        "mini": "Mini",
+        "maxi": "Maxi",
+        "setZurueck": "Nach Umschalten zurück nach:",
+        "setFarben": "Farben ({n} Varianten)",
+        "schliessen": "Schließen",
+        "aktualisiert": "aktualisiert {zeit}",
+        "netzFehler": "Netzwerkfehler – neuer Versuch…",
+        "ratePause": "Rate-Limit (429) – Pause",
+        "tokenUngueltig": "Token ungültig!",
+        "laeuftBereits": "Der Ticker läuft bereits.\n\nDas Fenster steckt im Infobereich der Taskleiste — Rechtsklick aufs Symbol.",
+        "unbekannt": "unbekannt",
+        "direkt": "direkt",
+    },
+    "en": {
+        "_name": "English",
+        "titel": "Visitors",
+        "lade": "loading…",
+        "aufrufe": "Views",
+        "heuteN": "{n} today",
+        "gesamtN": "{n} total",
+        "jeWerkzeug": "Visitors per tool",
+        "startseite": "Home page",
+        "zeitHeute": "Today",
+        "zeit7": "7 days",
+        "zeit30": "30 days",
+        "zeitGesamt": "All time",
+        "zusAus": "off",
+        "zusLaender": "Countries",
+        "zusVerweise": "Referrers",
+        "standard": "default",
+        "dauerhaft": "permanently",
+        "sekunden": "{n} seconds",
+        "themeSPB": "Black / Pink / Blue",
+        "themeSPE": "Black / Pink / Ice blue",
+        "themeTMI": "Deep black / Magenta / Indigo",
+        "frageSite": "Address of the GoatCounter site:\n(e.g. dennis-mit-2n  or  dennis-mit-2n.goatcounter.com)",
+        "frageToken": "Paste the API token\n(GoatCounter → user name at the top right → API →\n“Add new token”, the “Read statistics” permission is enough):",
+        "mOverlay": "Show/hide overlay",
+        "mMitte": "Bring overlay to centre",
+        "mJetzt": "Refresh now",
+        "mZeitraum": "Time range",
+        "mZusatz": "Extra block",
+        "mEinstellungen": "Settings…",
+        "mTheme": "Next theme",
+        "mZugang": "Change access",
+        "mSprache": "Language",
+        "mBeenden": "Quit",
+        "setTitel": "Besucher-Ticker · Settings",
+        "setFreq": "Update frequency",
+        "setFreqHinweis": "GoatCounter allows 4 requests per second,\nso even 15 s is no problem.",
+        "setZeitraum": "Time range for bars and subtotal",
+        "setZusatz": "Extra block below the bars",
+        "setBalken": "At most this many bars",
+        "setAlpha": "Opacity ({min} to {max} %)",
+        "setMiniMaxi": "Mini/maxi mode",
+        "mini": "Mini",
+        "maxi": "Maxi",
+        "setZurueck": "Switch back after:",
+        "setFarben": "Colours ({n} variants)",
+        "schliessen": "Close",
+        "aktualisiert": "updated {zeit}",
+        "netzFehler": "Network error, retrying…",
+        "ratePause": "Rate limit (429), pausing",
+        "tokenUngueltig": "Token invalid!",
+        "laeuftBereits": "The ticker is already running.\n\nIts window sits in the notification area of the taskbar, right-click the icon.",
+        "unbekannt": "unknown",
+        "direkt": "direct",
+    },
+    "es": {
+        "_name": "Español",
+        "titel": "Visitas",
+        "lade": "cargando…",
+        "aufrufe": "Visitas",
+        "heuteN": "{n} hoy",
+        "gesamtN": "{n} en total",
+        "jeWerkzeug": "Visitas por herramienta",
+        "startseite": "Página de inicio",
+        "zeitHeute": "Hoy",
+        "zeit7": "7 días",
+        "zeit30": "30 días",
+        "zeitGesamt": "Todo",
+        "zusAus": "no",
+        "zusLaender": "Países",
+        "zusVerweise": "Referencias",
+        "standard": "predeterminado",
+        "dauerhaft": "siempre",
+        "sekunden": "{n} segundos",
+        "themeSPB": "Negro / Rosa / Azul",
+        "themeSPE": "Negro / Rosa / Azul hielo",
+        "themeTMI": "Negro intenso / Magenta / Índigo",
+        "frageSite": "Dirección del sitio de GoatCounter:\n(p. ej. dennis-mit-2n  o  dennis-mit-2n.goatcounter.com)",
+        "frageToken": "Pega el token de la API\n(GoatCounter → nombre de usuario arriba a la derecha → API →\n«Add new token»; basta con el permiso «Read statistics»):",
+        "mOverlay": "Mostrar/ocultar overlay",
+        "mMitte": "Traer el overlay al centro",
+        "mJetzt": "Actualizar ahora",
+        "mZeitraum": "Periodo",
+        "mZusatz": "Bloque extra",
+        "mEinstellungen": "Ajustes…",
+        "mTheme": "Siguiente tema",
+        "mZugang": "Cambiar acceso",
+        "mSprache": "Idioma",
+        "mBeenden": "Salir",
+        "setTitel": "Besucher-Ticker · Ajustes",
+        "setFreq": "Frecuencia de actualización",
+        "setFreqHinweis": "GoatCounter permite 4 peticiones por segundo,\nasí que incluso 15 s no es problema.",
+        "setZeitraum": "Periodo para barras y subtotal",
+        "setZusatz": "Bloque extra bajo las barras",
+        "setBalken": "Como máximo tantas barras",
+        "setAlpha": "Opacidad (de {min} a {max} %)",
+        "setMiniMaxi": "Modo mini/maxi",
+        "mini": "Mini",
+        "maxi": "Maxi",
+        "setZurueck": "Volver tras:",
+        "setFarben": "Colores ({n} variantes)",
+        "schliessen": "Cerrar",
+        "aktualisiert": "actualizado {zeit}",
+        "netzFehler": "Error de red, reintentando…",
+        "ratePause": "Límite de peticiones (429), pausa",
+        "tokenUngueltig": "¡Token no válido!",
+        "laeuftBereits": "El ticker ya está en marcha.\n\nSu ventana está en el área de notificación de la barra de tareas: haz clic derecho en el icono.",
+        "unbekannt": "desconocido",
+        "direkt": "directo",
+    },
+    "fr": {
+        "_name": "Français",
+        "titel": "Visiteurs",
+        "lade": "chargement…",
+        "aufrufe": "Vues",
+        "heuteN": "{n} aujourd’hui",
+        "gesamtN": "{n} au total",
+        "jeWerkzeug": "Visiteurs par outil",
+        "startseite": "Page d’accueil",
+        "zeitHeute": "Aujourd’hui",
+        "zeit7": "7 jours",
+        "zeit30": "30 jours",
+        "zeitGesamt": "Depuis le début",
+        "zusAus": "non",
+        "zusLaender": "Pays",
+        "zusVerweise": "Référents",
+        "standard": "par défaut",
+        "dauerhaft": "en permanence",
+        "sekunden": "{n} secondes",
+        "themeSPB": "Noir / Rose / Bleu",
+        "themeSPE": "Noir / Rose / Bleu glacier",
+        "themeTMI": "Noir profond / Magenta / Indigo",
+        "frageSite": "Adresse du site GoatCounter :\n(p. ex. dennis-mit-2n  ou  dennis-mit-2n.goatcounter.com)",
+        "frageToken": "Collez le jeton d’API\n(GoatCounter → nom d’utilisateur en haut à droite → API →\n« Add new token », le droit « Read statistics » suffit) :",
+        "mOverlay": "Afficher/masquer l’overlay",
+        "mMitte": "Ramener l’overlay au centre",
+        "mJetzt": "Actualiser maintenant",
+        "mZeitraum": "Période",
+        "mZusatz": "Bloc supplémentaire",
+        "mEinstellungen": "Réglages…",
+        "mTheme": "Thème suivant",
+        "mZugang": "Changer l’accès",
+        "mSprache": "Langue",
+        "mBeenden": "Quitter",
+        "setTitel": "Besucher-Ticker · Réglages",
+        "setFreq": "Fréquence de mise à jour",
+        "setFreqHinweis": "GoatCounter autorise 4 requêtes par seconde,\nmême 15 s ne pose aucun problème.",
+        "setZeitraum": "Période pour les barres et le sous-total",
+        "setZusatz": "Bloc supplémentaire sous les barres",
+        "setBalken": "Au plus autant de barres",
+        "setAlpha": "Opacité (de {min} à {max} %)",
+        "setMiniMaxi": "Mode mini/maxi",
+        "mini": "Mini",
+        "maxi": "Maxi",
+        "setZurueck": "Revenir après :",
+        "setFarben": "Couleurs ({n} variantes)",
+        "schliessen": "Fermer",
+        "aktualisiert": "mis à jour {zeit}",
+        "netzFehler": "Erreur réseau, nouvel essai…",
+        "ratePause": "Limite de requêtes (429), pause",
+        "tokenUngueltig": "Jeton non valide !",
+        "laeuftBereits": "Le ticker est déjà lancé.\n\nSa fenêtre se trouve dans la zone de notification de la barre des tâches : faites un clic droit sur l’icône.",
+        "unbekannt": "inconnu",
+        "direkt": "direct",
+    },
+    "it": {
+        "_name": "Italiano",
+        "titel": "Visitatori",
+        "lade": "caricamento…",
+        "aufrufe": "Visualizzazioni",
+        "heuteN": "{n} oggi",
+        "gesamtN": "{n} in totale",
+        "jeWerkzeug": "Visitatori per strumento",
+        "startseite": "Pagina iniziale",
+        "zeitHeute": "Oggi",
+        "zeit7": "7 giorni",
+        "zeit30": "30 giorni",
+        "zeitGesamt": "Da sempre",
+        "zusAus": "no",
+        "zusLaender": "Paesi",
+        "zusVerweise": "Referrer",
+        "standard": "predefinito",
+        "dauerhaft": "sempre",
+        "sekunden": "{n} secondi",
+        "themeSPB": "Nero / Rosa / Blu",
+        "themeSPE": "Nero / Rosa / Azzurro ghiaccio",
+        "themeTMI": "Nero profondo / Magenta / Indaco",
+        "frageSite": "Indirizzo del sito GoatCounter:\n(per es. dennis-mit-2n  o  dennis-mit-2n.goatcounter.com)",
+        "frageToken": "Incolla il token API\n(GoatCounter → nome utente in alto a destra → API →\n«Add new token», basta il permesso «Read statistics»):",
+        "mOverlay": "Mostra/nascondi overlay",
+        "mMitte": "Riporta l’overlay al centro",
+        "mJetzt": "Aggiorna ora",
+        "mZeitraum": "Periodo",
+        "mZusatz": "Blocco extra",
+        "mEinstellungen": "Impostazioni…",
+        "mTheme": "Tema successivo",
+        "mZugang": "Cambia accesso",
+        "mSprache": "Lingua",
+        "mBeenden": "Esci",
+        "setTitel": "Besucher-Ticker · Impostazioni",
+        "setFreq": "Frequenza di aggiornamento",
+        "setFreqHinweis": "GoatCounter consente 4 richieste al secondo,\nanche 15 s non sono un problema.",
+        "setZeitraum": "Periodo per barre e subtotale",
+        "setZusatz": "Blocco extra sotto le barre",
+        "setBalken": "Al massimo tante barre",
+        "setAlpha": "Opacità (da {min} a {max} %)",
+        "setMiniMaxi": "Modalità mini/maxi",
+        "mini": "Mini",
+        "maxi": "Maxi",
+        "setZurueck": "Torna indietro dopo:",
+        "setFarben": "Colori ({n} varianti)",
+        "schliessen": "Chiudi",
+        "aktualisiert": "aggiornato {zeit}",
+        "netzFehler": "Errore di rete, nuovo tentativo…",
+        "ratePause": "Limite di richieste (429), pausa",
+        "tokenUngueltig": "Token non valido!",
+        "laeuftBereits": "Il ticker è già in esecuzione.\n\nLa sua finestra è nell’area di notifica della barra delle applicazioni: fai clic destro sull’icona.",
+        "unbekannt": "sconosciuto",
+        "direkt": "diretto",
+    },
+    "nl": {
+        "_name": "Nederlands",
+        "titel": "Bezoekers",
+        "lade": "laden…",
+        "aufrufe": "Weergaven",
+        "heuteN": "{n} vandaag",
+        "gesamtN": "{n} in totaal",
+        "jeWerkzeug": "Bezoekers per tool",
+        "startseite": "Startpagina",
+        "zeitHeute": "Vandaag",
+        "zeit7": "7 dagen",
+        "zeit30": "30 dagen",
+        "zeitGesamt": "Altijd",
+        "zusAus": "uit",
+        "zusLaender": "Landen",
+        "zusVerweise": "Verwijzers",
+        "standard": "standaard",
+        "dauerhaft": "altijd",
+        "sekunden": "{n} seconden",
+        "themeSPB": "Zwart / Roze / Blauw",
+        "themeSPE": "Zwart / Roze / IJsblauw",
+        "themeTMI": "Diepzwart / Magenta / Indigo",
+        "frageSite": "Adres van de GoatCounter-site:\n(bijv. dennis-mit-2n  of  dennis-mit-2n.goatcounter.com)",
+        "frageToken": "API-token plakken\n(GoatCounter → gebruikersnaam rechtsboven → API →\n‘Add new token’, het recht ‘Read statistics’ is genoeg):",
+        "mOverlay": "Overlay tonen/verbergen",
+        "mMitte": "Overlay naar het midden halen",
+        "mJetzt": "Nu bijwerken",
+        "mZeitraum": "Periode",
+        "mZusatz": "Extra blok",
+        "mEinstellungen": "Instellingen…",
+        "mTheme": "Volgend thema",
+        "mZugang": "Toegang wijzigen",
+        "mSprache": "Taal",
+        "mBeenden": "Afsluiten",
+        "setTitel": "Besucher-Ticker · Instellingen",
+        "setFreq": "Updatefrequentie",
+        "setFreqHinweis": "GoatCounter staat 4 verzoeken per seconde toe,\ndus zelfs 15 s is geen probleem.",
+        "setZeitraum": "Periode voor balken en subtotaal",
+        "setZusatz": "Extra blok onder de balken",
+        "setBalken": "Hoogstens zoveel balken",
+        "setAlpha": "Dekking ({min} tot {max} %)",
+        "setMiniMaxi": "Mini-/maximodus",
+        "mini": "Mini",
+        "maxi": "Maxi",
+        "setZurueck": "Terugschakelen na:",
+        "setFarben": "Kleuren ({n} varianten)",
+        "schliessen": "Sluiten",
+        "aktualisiert": "bijgewerkt {zeit}",
+        "netzFehler": "Netwerkfout, nieuwe poging…",
+        "ratePause": "Limiet bereikt (429), pauze",
+        "tokenUngueltig": "Token ongeldig!",
+        "laeuftBereits": "De ticker draait al.\n\nHet venster zit in het systeemvak van de taakbalk: klik met rechts op het pictogram.",
+        "unbekannt": "onbekend",
+        "direkt": "direct",
+    },
+    "pl": {
+        "_name": "Polski",
+        "titel": "Odwiedziny",
+        "lade": "wczytywanie…",
+        "aufrufe": "Wyświetlenia",
+        "heuteN": "dziś: {n}",
+        "gesamtN": "razem: {n}",
+        "jeWerkzeug": "Odwiedziny według narzędzia",
+        "startseite": "Strona główna",
+        "zeitHeute": "Dziś",
+        "zeit7": "7 dni",
+        "zeit30": "30 dni",
+        "zeitGesamt": "Od początku",
+        "zusAus": "wył.",
+        "zusLaender": "Kraje",
+        "zusVerweise": "Odsyłacze",
+        "standard": "domyślnie",
+        "dauerhaft": "na stałe",
+        "sekunden": "{n} s",
+        "themeSPB": "Czarny / Różowy / Niebieski",
+        "themeSPE": "Czarny / Różowy / Lodowy błękit",
+        "themeTMI": "Głęboka czerń / Magenta / Indygo",
+        "frageSite": "Adres strony GoatCounter:\n(np. dennis-mit-2n  lub  dennis-mit-2n.goatcounter.com)",
+        "frageToken": "Wklej token API\n(GoatCounter → nazwa użytkownika w prawym górnym rogu → API →\n„Add new token”, wystarczy uprawnienie „Read statistics”):",
+        "mOverlay": "Pokaż/ukryj nakładkę",
+        "mMitte": "Przenieś nakładkę na środek",
+        "mJetzt": "Odśwież teraz",
+        "mZeitraum": "Okres",
+        "mZusatz": "Dodatkowy blok",
+        "mEinstellungen": "Ustawienia…",
+        "mTheme": "Następny motyw",
+        "mZugang": "Zmień dostęp",
+        "mSprache": "Język",
+        "mBeenden": "Zakończ",
+        "setTitel": "Besucher-Ticker · Ustawienia",
+        "setFreq": "Częstotliwość odświeżania",
+        "setFreqHinweis": "GoatCounter pozwala na 4 zapytania na sekundę,\nwięc nawet 15 s to żaden problem.",
+        "setZeitraum": "Okres dla pasków i sumy częściowej",
+        "setZusatz": "Dodatkowy blok pod paskami",
+        "setBalken": "Najwyżej tyle pasków",
+        "setAlpha": "Krycie (od {min} do {max} %)",
+        "setMiniMaxi": "Tryb mini/maxi",
+        "mini": "Mini",
+        "maxi": "Maxi",
+        "setZurueck": "Wróć po:",
+        "setFarben": "Kolory (warianty: {n})",
+        "schliessen": "Zamknij",
+        "aktualisiert": "aktualizacja {zeit}",
+        "netzFehler": "Błąd sieci, ponawiam…",
+        "ratePause": "Limit zapytań (429), przerwa",
+        "tokenUngueltig": "Nieprawidłowy token!",
+        "laeuftBereits": "Ticker już działa.\n\nJego okno jest w obszarze powiadomień paska zadań: kliknij ikonę prawym przyciskiem.",
+        "unbekannt": "nieznane",
+        "direkt": "bezpośrednio",
+    },
+    "pt": {
+        "_name": "Português",
+        "titel": "Visitantes",
+        "lade": "carregando…",
+        "aufrufe": "Visualizações",
+        "heuteN": "{n} hoje",
+        "gesamtN": "{n} no total",
+        "jeWerkzeug": "Visitantes por ferramenta",
+        "startseite": "Página inicial",
+        "zeitHeute": "Hoje",
+        "zeit7": "7 dias",
+        "zeit30": "30 dias",
+        "zeitGesamt": "Desde sempre",
+        "zusAus": "não",
+        "zusLaender": "Países",
+        "zusVerweise": "Origens",
+        "standard": "padrão",
+        "dauerhaft": "sempre",
+        "sekunden": "{n} segundos",
+        "themeSPB": "Preto / Rosa / Azul",
+        "themeSPE": "Preto / Rosa / Azul-gelo",
+        "themeTMI": "Preto profundo / Magenta / Índigo",
+        "frageSite": "Endereço do site no GoatCounter:\n(ex.: dennis-mit-2n  ou  dennis-mit-2n.goatcounter.com)",
+        "frageToken": "Cole o token da API\n(GoatCounter → nome de usuário no canto superior direito → API →\n«Add new token», a permissão «Read statistics» basta):",
+        "mOverlay": "Mostrar/ocultar overlay",
+        "mMitte": "Trazer o overlay para o centro",
+        "mJetzt": "Atualizar agora",
+        "mZeitraum": "Período",
+        "mZusatz": "Bloco extra",
+        "mEinstellungen": "Configurações…",
+        "mTheme": "Próximo tema",
+        "mZugang": "Mudar acesso",
+        "mSprache": "Idioma",
+        "mBeenden": "Sair",
+        "setTitel": "Besucher-Ticker · Configurações",
+        "setFreq": "Frequência de atualização",
+        "setFreqHinweis": "O GoatCounter permite 4 requisições por segundo,\nentão até 15 s é tranquilo.",
+        "setZeitraum": "Período para as barras e o subtotal",
+        "setZusatz": "Bloco extra abaixo das barras",
+        "setBalken": "No máximo esta quantidade de barras",
+        "setAlpha": "Opacidade (de {min} a {max} %)",
+        "setMiniMaxi": "Modo mini/maxi",
+        "mini": "Mini",
+        "maxi": "Maxi",
+        "setZurueck": "Voltar depois de:",
+        "setFarben": "Cores ({n} variantes)",
+        "schliessen": "Fechar",
+        "aktualisiert": "atualizado {zeit}",
+        "netzFehler": "Erro de rede, tentando de novo…",
+        "ratePause": "Limite de requisições (429), pausa",
+        "tokenUngueltig": "Token inválido!",
+        "laeuftBereits": "O ticker já está em execução.\n\nA janela fica na área de notificação da barra de tarefas: clique no ícone com o botão direito.",
+        "unbekannt": "desconhecido",
+        "direkt": "direto",
+    },
+    "tr": {
+        "_name": "Türkçe",
+        "titel": "Ziyaretçiler",
+        "lade": "yükleniyor…",
+        "aufrufe": "Görüntüleme",
+        "heuteN": "bugün {n}",
+        "gesamtN": "toplam {n}",
+        "jeWerkzeug": "Araç başına ziyaretçi",
+        "startseite": "Ana sayfa",
+        "zeitHeute": "Bugün",
+        "zeit7": "7 gün",
+        "zeit30": "30 gün",
+        "zeitGesamt": "Tüm zamanlar",
+        "zusAus": "kapalı",
+        "zusLaender": "Ülkeler",
+        "zusVerweise": "Yönlendirenler",
+        "standard": "varsayılan",
+        "dauerhaft": "kalıcı",
+        "sekunden": "{n} saniye",
+        "themeSPB": "Siyah / Pembe / Mavi",
+        "themeSPE": "Siyah / Pembe / Buz mavisi",
+        "themeTMI": "Koyu siyah / Macenta / Çivit",
+        "frageSite": "GoatCounter sitesinin adresi:\n(örn. dennis-mit-2n  veya  dennis-mit-2n.goatcounter.com)",
+        "frageToken": "API anahtarını yapıştırın\n(GoatCounter → sağ üstte kullanıcı adı → API →\n“Add new token”, “Read statistics” izni yeterli):",
+        "mOverlay": "Katmanı göster/gizle",
+        "mMitte": "Katmanı ortaya getir",
+        "mJetzt": "Şimdi güncelle",
+        "mZeitraum": "Zaman aralığı",
+        "mZusatz": "Ek blok",
+        "mEinstellungen": "Ayarlar…",
+        "mTheme": "Sonraki tema",
+        "mZugang": "Erişimi değiştir",
+        "mSprache": "Dil",
+        "mBeenden": "Çık",
+        "setTitel": "Besucher-Ticker · Ayarlar",
+        "setFreq": "Güncelleme sıklığı",
+        "setFreqHinweis": "GoatCounter saniyede 4 isteğe izin verir,\nyani 15 s bile sorun değil.",
+        "setZeitraum": "Çubuklar ve ara toplam için zaman aralığı",
+        "setZusatz": "Çubukların altındaki ek blok",
+        "setBalken": "En fazla bu kadar çubuk",
+        "setAlpha": "Opaklık (%{min} ile %{max} arası)",
+        "setMiniMaxi": "Mini/maksi modu",
+        "mini": "Mini",
+        "maxi": "Maksi",
+        "setZurueck": "Şu süre sonra geri dön:",
+        "setFarben": "Renkler ({n} çeşit)",
+        "schliessen": "Kapat",
+        "aktualisiert": "güncellendi {zeit}",
+        "netzFehler": "Ağ hatası, yeniden deneniyor…",
+        "ratePause": "İstek sınırı (429), mola",
+        "tokenUngueltig": "Anahtar geçersiz!",
+        "laeuftBereits": "Ticker zaten çalışıyor.\n\nPenceresi görev çubuğunun bildirim alanında: simgeye sağ tıklayın.",
+        "unbekannt": "bilinmiyor",
+        "direkt": "doğrudan",
+    },
+    "ru": {
+        "_name": "Русский",
+        "titel": "Посетители",
+        "lade": "загрузка…",
+        "aufrufe": "Просмотры",
+        "heuteN": "сегодня: {n}",
+        "gesamtN": "всего: {n}",
+        "jeWerkzeug": "Посетители по инструментам",
+        "startseite": "Главная страница",
+        "zeitHeute": "Сегодня",
+        "zeit7": "7 дней",
+        "zeit30": "30 дней",
+        "zeitGesamt": "За всё время",
+        "zusAus": "выкл.",
+        "zusLaender": "Страны",
+        "zusVerweise": "Источники",
+        "standard": "по умолчанию",
+        "dauerhaft": "постоянно",
+        "sekunden": "{n} с",
+        "themeSPB": "Чёрный / Розовый / Синий",
+        "themeSPE": "Чёрный / Розовый / Ледяной синий",
+        "themeTMI": "Глубокий чёрный / Пурпурный / Индиго",
+        "frageSite": "Адрес сайта в GoatCounter:\n(напр. dennis-mit-2n  или  dennis-mit-2n.goatcounter.com)",
+        "frageToken": "Вставьте токен API\n(GoatCounter → имя пользователя справа вверху → API →\n«Add new token», достаточно права «Read statistics»):",
+        "mOverlay": "Показать/скрыть оверлей",
+        "mMitte": "Вернуть оверлей в центр",
+        "mJetzt": "Обновить сейчас",
+        "mZeitraum": "Период",
+        "mZusatz": "Дополнительный блок",
+        "mEinstellungen": "Настройки…",
+        "mTheme": "Следующая тема",
+        "mZugang": "Изменить доступ",
+        "mSprache": "Язык",
+        "mBeenden": "Выход",
+        "setTitel": "Besucher-Ticker · Настройки",
+        "setFreq": "Частота обновления",
+        "setFreqHinweis": "GoatCounter разрешает 4 запроса в секунду,\nтак что даже 15 с не проблема.",
+        "setZeitraum": "Период для полос и промежуточной суммы",
+        "setZusatz": "Дополнительный блок под полосами",
+        "setBalken": "Не больше стольких полос",
+        "setAlpha": "Непрозрачность (от {min} до {max} %)",
+        "setMiniMaxi": "Режим мини/макси",
+        "mini": "Мини",
+        "maxi": "Макси",
+        "setZurueck": "Вернуть через:",
+        "setFarben": "Цвета (вариантов: {n})",
+        "schliessen": "Закрыть",
+        "aktualisiert": "обновлено {zeit}",
+        "netzFehler": "Ошибка сети, повтор…",
+        "ratePause": "Лимит запросов (429), пауза",
+        "tokenUngueltig": "Токен недействителен!",
+        "laeuftBereits": "Тикер уже запущен.\n\nЕго окно находится в области уведомлений панели задач: щёлкните по значку правой кнопкой.",
+        "unbekannt": "неизвестно",
+        "direkt": "напрямую",
+    },
+    "hi": {
+        "_name": "हिन्दी",
+        "titel": "विज़िटर",
+        "lade": "लोड हो रहा है…",
+        "aufrufe": "व्यू",
+        "heuteN": "आज {n}",
+        "gesamtN": "कुल {n}",
+        "jeWerkzeug": "हर टूल के विज़िटर",
+        "startseite": "होम पेज",
+        "zeitHeute": "आज",
+        "zeit7": "7 दिन",
+        "zeit30": "30 दिन",
+        "zeitGesamt": "शुरू से अब तक",
+        "zusAus": "बंद",
+        "zusLaender": "देश",
+        "zusVerweise": "रेफ़रर",
+        "standard": "डिफ़ॉल्ट",
+        "dauerhaft": "हमेशा",
+        "sekunden": "{n} सेकंड",
+        "themeSPB": "काला / गुलाबी / नीला",
+        "themeSPE": "काला / गुलाबी / बर्फ़ीला नीला",
+        "themeTMI": "गहरा काला / मैजेंटा / इंडिगो",
+        "frageSite": "GoatCounter साइट का पता:\n(जैसे dennis-mit-2n  या  dennis-mit-2n.goatcounter.com)",
+        "frageToken": "API टोकन चिपकाएँ\n(GoatCounter → ऊपर दाईं ओर उपयोगकर्ता नाम → API →\n“Add new token”, “Read statistics” अनुमति काफ़ी है):",
+        "mOverlay": "ओवरले दिखाएँ/छिपाएँ",
+        "mMitte": "ओवरले को बीच में लाएँ",
+        "mJetzt": "अभी अपडेट करें",
+        "mZeitraum": "समय अवधि",
+        "mZusatz": "अतिरिक्त ब्लॉक",
+        "mEinstellungen": "सेटिंग्स…",
+        "mTheme": "अगली थीम",
+        "mZugang": "पहुँच बदलें",
+        "mSprache": "भाषा",
+        "mBeenden": "बंद करें",
+        "setTitel": "Besucher-Ticker · सेटिंग्स",
+        "setFreq": "अपडेट की आवृत्ति",
+        "setFreqHinweis": "GoatCounter हर सेकंड 4 अनुरोधों की अनुमति देता है,\nइसलिए 15 s भी कोई समस्या नहीं।",
+        "setZeitraum": "बार और उप-योग के लिए समय अवधि",
+        "setZusatz": "बार के नीचे अतिरिक्त ब्लॉक",
+        "setBalken": "अधिकतम इतने बार",
+        "setAlpha": "अपारदर्शिता ({min} से {max} %)",
+        "setMiniMaxi": "मिनी/मैक्सी मोड",
+        "mini": "मिनी",
+        "maxi": "मैक्सी",
+        "setZurueck": "इतने बाद वापस जाएँ:",
+        "setFarben": "रंग ({n} प्रकार)",
+        "schliessen": "बंद करें",
+        "aktualisiert": "अपडेट {zeit}",
+        "netzFehler": "नेटवर्क त्रुटि, फिर से कोशिश…",
+        "ratePause": "अनुरोध सीमा (429), विराम",
+        "tokenUngueltig": "टोकन अमान्य!",
+        "laeuftBereits": "टिकर पहले से चल रहा है।\n\nइसकी विंडो टास्कबार के सूचना क्षेत्र में है: आइकन पर राइट-क्लिक करें।",
+        "unbekannt": "अज्ञात",
+        "direkt": "सीधे",
+    },
+    "zh": {
+        "_name": "中文",
+        "titel": "访客",
+        "lade": "正在加载…",
+        "aufrufe": "浏览量",
+        "heuteN": "今天 {n}",
+        "gesamtN": "总计 {n}",
+        "jeWerkzeug": "各工具的访客",
+        "startseite": "首页",
+        "zeitHeute": "今天",
+        "zeit7": "7 天",
+        "zeit30": "30 天",
+        "zeitGesamt": "全部时间",
+        "zusAus": "关",
+        "zusLaender": "国家",
+        "zusVerweise": "来源",
+        "standard": "默认",
+        "dauerhaft": "一直",
+        "sekunden": "{n} 秒",
+        "themeSPB": "黑 / 粉 / 蓝",
+        "themeSPE": "黑 / 粉 / 冰蓝",
+        "themeTMI": "深黑 / 品红 / 靛蓝",
+        "frageSite": "GoatCounter 站点地址：\n（例如 dennis-mit-2n  或  dennis-mit-2n.goatcounter.com）",
+        "frageToken": "粘贴 API 令牌\n（GoatCounter → 右上角的用户名 → API →\n“Add new token”，有“Read statistics”权限就够了）：",
+        "mOverlay": "显示/隐藏悬浮窗",
+        "mMitte": "把悬浮窗移到屏幕中央",
+        "mJetzt": "立即更新",
+        "mZeitraum": "时间范围",
+        "mZusatz": "附加区块",
+        "mEinstellungen": "设置…",
+        "mTheme": "下一个主题",
+        "mZugang": "更改访问凭据",
+        "mSprache": "语言",
+        "mBeenden": "退出",
+        "setTitel": "Besucher-Ticker · 设置",
+        "setFreq": "更新频率",
+        "setFreqHinweis": "GoatCounter 允许每秒 4 个请求，\n所以就算 15 秒也没问题。",
+        "setZeitraum": "条形图和小计的时间范围",
+        "setZusatz": "条形图下方的附加区块",
+        "setBalken": "最多显示多少条",
+        "setAlpha": "不透明度（{min} 到 {max} %）",
+        "setMiniMaxi": "迷你/完整模式",
+        "mini": "迷你",
+        "maxi": "完整",
+        "setZurueck": "切换后多久恢复：",
+        "setFarben": "颜色（{n} 种）",
+        "schliessen": "关闭",
+        "aktualisiert": "更新于 {zeit}",
+        "netzFehler": "网络错误，正在重试…",
+        "ratePause": "请求超限 (429)，暂停",
+        "tokenUngueltig": "令牌无效！",
+        "laeuftBereits": "Ticker 已在运行。\n\n它的窗口在任务栏的通知区域：右键单击图标。",
+        "unbekannt": "未知",
+        "direkt": "直接访问",
+    },
+    "ja": {
+        "_name": "日本語",
+        "titel": "訪問者",
+        "lade": "読み込み中…",
+        "aufrufe": "表示回数",
+        "heuteN": "今日 {n}",
+        "gesamtN": "合計 {n}",
+        "jeWerkzeug": "ツールごとの訪問者",
+        "startseite": "トップページ",
+        "zeitHeute": "今日",
+        "zeit7": "7 日間",
+        "zeit30": "30 日間",
+        "zeitGesamt": "全期間",
+        "zusAus": "オフ",
+        "zusLaender": "国",
+        "zusVerweise": "参照元",
+        "standard": "標準",
+        "dauerhaft": "ずっと",
+        "sekunden": "{n} 秒",
+        "themeSPB": "黒 / ピンク / 青",
+        "themeSPE": "黒 / ピンク / アイスブルー",
+        "themeTMI": "漆黒 / マゼンタ / インディゴ",
+        "frageSite": "GoatCounter サイトのアドレス：\n（例：dennis-mit-2n  または  dennis-mit-2n.goatcounter.com）",
+        "frageToken": "API トークンを貼り付けてください\n（GoatCounter → 右上のユーザー名 → API →\n「Add new token」。「Read statistics」の権限で十分です）：",
+        "mOverlay": "オーバーレイの表示/非表示",
+        "mMitte": "オーバーレイを中央に戻す",
+        "mJetzt": "今すぐ更新",
+        "mZeitraum": "期間",
+        "mZusatz": "追加ブロック",
+        "mEinstellungen": "設定…",
+        "mTheme": "次のテーマ",
+        "mZugang": "アクセス情報を変更",
+        "mSprache": "言語",
+        "mBeenden": "終了",
+        "setTitel": "Besucher-Ticker · 設定",
+        "setFreq": "更新頻度",
+        "setFreqHinweis": "GoatCounter は毎秒 4 件までリクエストできるので、\n15 秒でも問題ありません。",
+        "setZeitraum": "バーと小計の期間",
+        "setZusatz": "バーの下の追加ブロック",
+        "setBalken": "バーの最大数",
+        "setAlpha": "不透明度（{min}〜{max} %）",
+        "setMiniMaxi": "ミニ/マキシ表示",
+        "mini": "ミニ",
+        "maxi": "マキシ",
+        "setZurueck": "切り替え後に戻すまで：",
+        "setFarben": "色（{n} 種類）",
+        "schliessen": "閉じる",
+        "aktualisiert": "更新 {zeit}",
+        "netzFehler": "ネットワークエラー、再試行中…",
+        "ratePause": "リクエスト上限 (429)、一時停止",
+        "tokenUngueltig": "トークンが無効です！",
+        "laeuftBereits": "Ticker はすでに起動しています。\n\nウィンドウはタスクバーの通知領域にあります。アイコンを右クリックしてください。",
+        "unbekannt": "不明",
+        "direkt": "直接",
+    },
+    "ko": {
+        "_name": "한국어",
+        "titel": "방문자",
+        "lade": "불러오는 중…",
+        "aufrufe": "조회수",
+        "heuteN": "오늘 {n}",
+        "gesamtN": "전체 {n}",
+        "jeWerkzeug": "도구별 방문자",
+        "startseite": "홈페이지",
+        "zeitHeute": "오늘",
+        "zeit7": "7일",
+        "zeit30": "30일",
+        "zeitGesamt": "전체 기간",
+        "zusAus": "끔",
+        "zusLaender": "국가",
+        "zusVerweise": "유입 경로",
+        "standard": "기본",
+        "dauerhaft": "계속",
+        "sekunden": "{n}초",
+        "themeSPB": "검정 / 분홍 / 파랑",
+        "themeSPE": "검정 / 분홍 / 얼음 파랑",
+        "themeTMI": "깊은 검정 / 자홍 / 남색",
+        "frageSite": "GoatCounter 사이트 주소:\n(예: dennis-mit-2n  또는  dennis-mit-2n.goatcounter.com)",
+        "frageToken": "API 토큰을 붙여 넣으세요\n(GoatCounter → 오른쪽 위 사용자 이름 → API →\n‘Add new token’, ‘Read statistics’ 권한이면 충분합니다):",
+        "mOverlay": "오버레이 표시/숨기기",
+        "mMitte": "오버레이를 가운데로",
+        "mJetzt": "지금 업데이트",
+        "mZeitraum": "기간",
+        "mZusatz": "추가 블록",
+        "mEinstellungen": "설정…",
+        "mTheme": "다음 테마",
+        "mZugang": "접속 정보 변경",
+        "mSprache": "언어",
+        "mBeenden": "종료",
+        "setTitel": "Besucher-Ticker · 설정",
+        "setFreq": "업데이트 빈도",
+        "setFreqHinweis": "GoatCounter는 초당 4건의 요청을 허용하므로\n15초도 문제없습니다.",
+        "setZeitraum": "막대와 소계의 기간",
+        "setZusatz": "막대 아래 추가 블록",
+        "setBalken": "최대 막대 수",
+        "setAlpha": "불투명도 ({min}~{max} %)",
+        "setMiniMaxi": "미니/맥시 모드",
+        "mini": "미니",
+        "maxi": "맥시",
+        "setZurueck": "전환 후 되돌릴 시간:",
+        "setFarben": "색상 ({n}가지)",
+        "schliessen": "닫기",
+        "aktualisiert": "업데이트 {zeit}",
+        "netzFehler": "네트워크 오류, 다시 시도 중…",
+        "ratePause": "요청 한도 (429), 잠시 멈춤",
+        "tokenUngueltig": "토큰이 올바르지 않습니다!",
+        "laeuftBereits": "Ticker가 이미 실행 중입니다.\n\n창은 작업 표시줄의 알림 영역에 있습니다. 아이콘을 마우스 오른쪽 버튼으로 클릭하세요.",
+        "unbekannt": "알 수 없음",
+        "direkt": "직접",
+    },
+}
+
+# Windows-Sprachkennung (untere 10 Bit) -> Sprachcode
+_LANGID = {0x07: "de", 0x09: "en", 0x0A: "es", 0x0C: "fr", 0x10: "it", 0x13: "nl", 0x15: "pl",
+           0x16: "pt", 0x1F: "tr", 0x19: "ru", 0x39: "hi", 0x04: "zh", 0x11: "ja", 0x12: "ko"}
+
+SPRACHE = "de"                        # beim Start aus config.json oder Windows gesetzt
+
+
+def systemsprache() -> str:
+    """Windows-Anzeigesprache, wenn der Ticker sie spricht, sonst Englisch."""
+    try:
+        import ctypes
+        return _LANGID.get(ctypes.windll.kernel32.GetUserDefaultUILanguage() & 0x3FF, "en")
+    except (ImportError, AttributeError, OSError):
+        return "en"
+
+
+def waehle_sprache(cfg: dict) -> str:
+    s = cfg.get("sprache")
+    return s if s in TEXTE else systemsprache()
+
+
+def tx(schluessel: str, **werte) -> str:
+    """Text in der gewählten Sprache; {n}, {zeit} usw. werden eingesetzt."""
+    s = TEXTE[SPRACHE].get(schluessel) or TEXTE["en"].get(schluessel, schluessel)
+    for k, v in werte.items():
+        s = s.replace("{" + k + "}", str(v))
+    return s
+
+
+def anzeige(label: str) -> str:
+    """Interne Beschriftungen der Balken und Listen in der gewählten Sprache."""
+    if label == "Startseite":
+        return tx("startseite")
+    if label in ("(unbekannt)", "(direkt)"):
+        return f"({tx(label[1:-1])})"
+    return label
+
+
+def refresh_name(sek: float) -> str:
+    name = f"{sek / 60:g} min" if sek >= 120 else f"{sek:g} s"
+    return name + (f"  ({tx('standard')})" if sek == DEFAULT_REFRESH else "")
+
+
+def dauer_name(sek: int | None) -> str:
+    return tx("dauerhaft") if sek is None else tx("sekunden", n=sek)
+
+
+def theme_anzeige(name: str) -> str:
+    return tx(THEME_TEXT[name]) if name in THEME_TEXT else name
 
 # ------------------------------ Config --------------------------------------
 
@@ -354,8 +1182,7 @@ def ask_site(parent: tk.Tk | None = None, vorgabe: str = "") -> str | None:
         own_root = True
     wert = simpledialog.askstring(
         "Besucher-Ticker",
-        "Adresse der GoatCounter-Seite:\n"
-        "(z. B. dennis-mit-2n  oder  dennis-mit-2n.goatcounter.com)",
+        tx("frageSite"),
         initialvalue=vorgabe,
         parent=parent,
     )
@@ -373,9 +1200,7 @@ def ask_token(parent: tk.Tk | None = None) -> str | None:
         own_root = True
     token = simpledialog.askstring(
         "Besucher-Ticker",
-        "API-Token einfügen\n"
-        "(GoatCounter → Benutzername oben rechts → API →\n"
-        "\"Add new token\", Recht \"Read statistics\" genügt):",
+        tx("frageToken"),
         parent=parent,
     )
     if own_root:
@@ -532,9 +1357,12 @@ def auswerten_stats(payload: dict, max_zeilen: int = 4,
     return reihen[:max_zeilen]
 
 
+_TRENNER = {"en": ",", "hi": ",", "zh": ",", "ja": ",", "ko": ",", "fr": "\u202f", "ru": "\u00a0", "pl": "\u00a0"}
+
+
 def zahl_kurz(n: int) -> str:
-    """Tausenderpunkte deutscher Schreibweise, ohne locale-Abhängigkeit."""
-    return f"{n:,}".replace(",", ".")
+    """Tausendertrennung in der Schreibweise der Sprache, ohne locale-Abhängigkeit."""
+    return f"{n:,}".replace(",", _TRENNER.get(SPRACHE, "."))
 
 
 # ------------------------------ App -----------------------------------------
@@ -542,7 +1370,9 @@ def zahl_kurz(n: int) -> str:
 
 class TickerApp:
     def __init__(self):
+        global SPRACHE
         self.cfg = load_config()
+        SPRACHE = waehle_sprache(self.cfg)
 
         site = self.cfg.get("site")
         if not site:
@@ -605,19 +1435,19 @@ class TickerApp:
         return THEMES[self.theme_name]
 
     def zeitraum_name(self) -> str:
-        return next((n for k, n, _ in ZEITRAEUME if k == self.zeitraum), "Heute")
+        return tx(next((n for k, n, _ in ZEITRAEUME if k == self.zeitraum), "zeitHeute"))
 
     def zusatz_page(self) -> str | None:
         return next((p for k, _, p in ZUSATZ_CHOICES if k == self.zusatz), None)
 
     def zusatz_name(self) -> str:
-        return next((n for k, n, _ in ZUSATZ_CHOICES if k == self.zusatz), "aus")
+        return tx(next((n for k, n, _ in ZUSATZ_CHOICES if k == self.zusatz), "zusAus"))
 
     # ---------- UI ----------
 
     def _build_ui(self):
         self.root = tk.Tk()
-        self.root.title("Besucher")
+        self.root.title(tx("titel"))
         self.root.overrideredirect(True)
         self.root.attributes("-topmost", True)
         self.root.attributes("-alpha", self.alpha_pct / 100.0)
@@ -631,7 +1461,7 @@ class TickerApp:
         self.frame = tk.Frame(self.root, bg=self.th["bg"], padx=10, pady=8)
         self.frame.pack()
 
-        self.title_lbl = tk.Label(self.frame, text="Besucher",
+        self.title_lbl = tk.Label(self.frame, text=tx("titel"),
                                   fg=self.th["title"], bg=self.th["bg"],
                                   font=("Segoe UI", 9, "bold"))
         self.title_lbl.pack(anchor="w")
@@ -639,7 +1469,7 @@ class TickerApp:
         self.body = tk.Frame(self.frame, bg=self.th["bg"])
         self.body.pack(fill="x")
 
-        self.status_lbl = tk.Label(self.frame, text="lade…",
+        self.status_lbl = tk.Label(self.frame, text=tx("lade"),
                                    fg=self.th["muted"], bg=self.th["bg"],
                                    font=("Segoe UI", 8))
         self.status_lbl.pack(anchor="w")
@@ -723,7 +1553,7 @@ class TickerApp:
         for w in self.body.winfo_children():
             w.destroy()
 
-        self.title_lbl.config(text=f"Besucher · {self.zeitraum_name()}")
+        self.title_lbl.config(text=f"{tx('titel')} · {self.zeitraum_name()}")
 
         if not self.daten:
             self._bind_drag_recursive(self.root)
@@ -737,7 +1567,7 @@ class TickerApp:
             tk.Label(self.body, text=zahl_kurz(zeitraum_total),
                      fg=t["big"], bg=t["bg"],
                      font=("Segoe UI", 16, "bold")).pack(anchor="w")
-            tk.Label(self.body, text=f"Aufrufe · {self.zeitraum_name()}",
+            tk.Label(self.body, text=f"{tx('aufrufe')} · {self.zeitraum_name()}",
                      fg=t["muted"], bg=t["bg"],
                      font=("Segoe UI", 8)).pack(anchor="w")
             self._bind_drag_recursive(self.root)
@@ -753,22 +1583,22 @@ class TickerApp:
                  font=("Segoe UI", 18, "bold")).pack(side="left")
         rechts = tk.Frame(kopf, bg=t["bg"])
         rechts.pack(side="right", anchor="s")
-        tk.Label(rechts, text=f"Aufrufe · {self.zeitraum_name()}",
+        tk.Label(rechts, text=f"{tx('aufrufe')} · {self.zeitraum_name()}",
                  fg=t["muted"], bg=t["bg"],
                  font=("Segoe UI", 8)).pack(anchor="e")
         if self.zeitraum != "heute":
-            tk.Label(rechts, text=f"{zahl_kurz(heute)} heute",
+            tk.Label(rechts, text=tx("heuteN", n=zahl_kurz(heute)),
                      fg=t["text"], bg=t["bg"],
                      font=("Segoe UI", 9, "bold")).pack(anchor="e")
         if gesamt is not None:
-            tk.Label(rechts, text=f"{zahl_kurz(gesamt)} gesamt",
+            tk.Label(rechts, text=tx("gesamtN", n=zahl_kurz(gesamt)),
                      fg=t["text"], bg=t["bg"],
                      font=("Segoe UI", 9, "bold")).pack(anchor="e")
 
         # --- Balken je Werkzeug ---
         balken = self.daten.get("balken") or []
         if balken:
-            tk.Label(self.body, text="Besucher je Werkzeug",
+            tk.Label(self.body, text=tx("jeWerkzeug"),
                      fg=t["muted"], bg=t["bg"],
                      font=("Segoe UI", 8)).pack(anchor="w", pady=(6, 0))
             hoechst = max(b["count"] for b in balken) or 1
@@ -777,7 +1607,7 @@ class TickerApp:
                 row.pack(fill="x", pady=(3, 0))
                 head = tk.Frame(row, bg=t["bg"])
                 head.pack(fill="x")
-                tk.Label(head, text=b["label"], fg=t["text"], bg=t["bg"],
+                tk.Label(head, text=anzeige(b["label"]), fg=t["text"], bg=t["bg"],
                          font=("Segoe UI", 9)).pack(side="left")
                 tk.Label(head, text=zahl_kurz(b["count"]), fg=t["text"],
                          bg=t["bg"],
@@ -798,7 +1628,7 @@ class TickerApp:
             for z in zusatz:
                 row = tk.Frame(self.body, bg=t["bg"])
                 row.pack(fill="x")
-                tk.Label(row, text=z["label"][:22], fg=t["text"], bg=t["bg"],
+                tk.Label(row, text=anzeige(z["label"])[:22], fg=t["text"], bg=t["bg"],
                          font=("Segoe UI", 8)).pack(side="left")
                 tk.Label(row, text=zahl_kurz(z["count"]), fg=t["muted"],
                          bg=t["bg"], font=("Segoe UI", 8)).pack(side="right")
@@ -827,7 +1657,7 @@ class TickerApp:
     def _build_tray(self):
         zeitraum_menu = pystray.Menu(*[
             pystray.MenuItem(
-                name,
+                tx(name),
                 (lambda k: (lambda *_: self.ui_queue.put(("zeitraum", k))))(key),
                 checked=(lambda k: (lambda _i: self.zeitraum == k))(key),
                 radio=True)
@@ -835,25 +1665,39 @@ class TickerApp:
         ])
         zusatz_menu = pystray.Menu(*[
             pystray.MenuItem(
-                name,
+                tx(name),
                 (lambda k: (lambda *_: self.ui_queue.put(("zusatz", k))))(key),
                 checked=(lambda k: (lambda _i: self.zusatz == k))(key),
                 radio=True)
             for key, name, _ in ZUSATZ_CHOICES
         ])
+        sprachen_menu = pystray.Menu(*[
+            pystray.MenuItem(
+                TEXTE[code]["_name"],
+                (lambda c: (lambda *_: self.ui_queue.put(("sprache", c))))(code),
+                checked=(lambda c: (lambda _i: SPRACHE == c))(code),
+                radio=True)
+            for code in TEXTE
+        ])
         menu = pystray.Menu(
-            pystray.MenuItem("Overlay an/aus", self._tray_toggle, default=True),
-            pystray.MenuItem("Overlay zur Mitte holen", self._tray_center),
-            pystray.MenuItem("Jetzt aktualisieren", self._tray_refresh),
+            pystray.MenuItem(tx("mOverlay"), self._tray_toggle, default=True),
+            pystray.MenuItem(tx("mMitte"), self._tray_center),
+            pystray.MenuItem(tx("mJetzt"), self._tray_refresh),
             pystray.Menu.SEPARATOR,
-            pystray.MenuItem("Zeitraum", zeitraum_menu),
-            pystray.MenuItem("Zusatzblock", zusatz_menu),
+            pystray.MenuItem(tx("mZeitraum"), zeitraum_menu),
+            pystray.MenuItem(tx("mZusatz"), zusatz_menu),
             pystray.Menu.SEPARATOR,
-            pystray.MenuItem("Einstellungen…", self._tray_settings),
-            pystray.MenuItem("Nächstes Theme", self._tray_next_theme),
-            pystray.MenuItem("Zugang ändern", self._tray_change_zugang),
-            pystray.MenuItem("Beenden", self._tray_quit),
+            pystray.MenuItem(tx("mEinstellungen"), self._tray_settings),
+            pystray.MenuItem(tx("mTheme"), self._tray_next_theme),
+            pystray.MenuItem(tx("mZugang"), self._tray_change_zugang),
+            pystray.MenuItem(tx("mSprache"), sprachen_menu),
+            pystray.MenuItem(tx("mBeenden"), self._tray_quit),
         )
+        if self.icon:                       # Sprachwechsel: altes Symbol abbauen
+            try:
+                self.icon.stop()
+            except Exception:
+                pass
         self.icon = pystray.Icon("besucher_ticker", self._tray_image(),
                                  "Besucher-Ticker", menu)
         threading.Thread(target=self.icon.run, daemon=True).start()
@@ -890,7 +1734,7 @@ class TickerApp:
         t = self.th
         win = tk.Toplevel(self.root)
         self.settings_win = win
-        win.title("Besucher-Ticker — Einstellungen")
+        win.title(tx("setTitel"))
         win.configure(bg=t["bg"], padx=14, pady=12)
         win.attributes("-topmost", True)
         win.resizable(False, False)
@@ -907,23 +1751,33 @@ class TickerApp:
         except tk.TclError:
             pass
 
+        # Auswahllisten 30 Zeichen breit wie bisher, breiter nur, wenn ein
+        # Eintrag in der gewählten Sprache sonst abgeschnitten würde.
+        schrift = tkfont.nametofont("TkTextFont")
+        alle = ([refresh_name(s) for s in REFRESH_CHOICES]
+                + [tx(n) for _, n, _ in ZEITRAEUME + ZUSATZ_CHOICES]
+                + [dauer_name(s) for s in COMPACT_DURATIONS]
+                + [theme_anzeige(n) for n in THEME_NAMES])
+        breite = max(30, -(-max(schrift.measure(w) for w in alle)
+                           // schrift.measure("0")) + 1)
+
         # --- Update-Frequenz ---
-        lbl("Update-Frequenz", 0, pady=(0, 2))
+        lbl(tx("setFreq"), 0, pady=(0, 2))
         self._refresh_var = tk.StringVar()
         current_label = next(
-            (name for name, sec in REFRESH_CHOICES
+            (refresh_name(sec) for sec in REFRESH_CHOICES
              if abs(sec - self.refresh_seconds) < 0.01),
             f"{self.refresh_seconds:g} s")
         self._refresh_var.set(current_label)
         cb_refresh = ttk.Combobox(win, textvariable=self._refresh_var,
-                                  values=[n for n, _ in REFRESH_CHOICES],
-                                  state="readonly", width=30)
+                                  values=[refresh_name(s) for s in REFRESH_CHOICES],
+                                  state="readonly", width=breite)
         cb_refresh.grid(row=1, column=0, columnspan=2, sticky="we")
 
         def on_refresh(_e=None):
             sel = self._refresh_var.get()
-            for name, sec in REFRESH_CHOICES:
-                if name == sel:
+            for sec in REFRESH_CHOICES:
+                if refresh_name(sec) == sel:
                     self.refresh_seconds = float(sec)
                     self.cfg["refresh_seconds"] = self.refresh_seconds
                     save_config(self.cfg)
@@ -931,49 +1785,48 @@ class TickerApp:
                     break
         cb_refresh.bind("<<ComboboxSelected>>", on_refresh)
 
-        tk.Label(win, text="GoatCounter erlaubt 4 Anfragen je Sekunde —"
-                           "\nselbst 15 s sind unkritisch.",
+        tk.Label(win, text=tx("setFreqHinweis"),
                  fg=t["muted"], bg=t["bg"], font=("Segoe UI", 8),
                  justify="left").grid(row=2, column=0, columnspan=2, sticky="w")
 
         # --- Zeitraum ---
-        lbl("Zeitraum für Balken und Zwischensumme", 3)
+        lbl(tx("setZeitraum"), 3)
         self._zr_var = tk.StringVar(value=self.zeitraum_name())
         cb_zr = ttk.Combobox(win, textvariable=self._zr_var,
-                             values=[n for _, n, _ in ZEITRAEUME],
-                             state="readonly", width=30)
+                             values=[tx(n) for _, n, _ in ZEITRAEUME],
+                             state="readonly", width=breite)
         cb_zr.grid(row=4, column=0, columnspan=2, sticky="we")
 
         def on_zr(_e=None):
             sel = self._zr_var.get()
             for key, name, _ in ZEITRAEUME:
-                if name == sel:
+                if tx(name) == sel:
                     self._set_zeitraum(key)
                     break
         cb_zr.bind("<<ComboboxSelected>>", on_zr)
 
         # --- Zusatzblock ---
-        lbl("Zusatzblock unter den Balken", 5)
+        lbl(tx("setZusatz"), 5)
         self._zus_var = tk.StringVar(value=self.zusatz_name())
         cb_zus = ttk.Combobox(win, textvariable=self._zus_var,
-                              values=[n for _, n, _ in ZUSATZ_CHOICES],
-                              state="readonly", width=30)
+                              values=[tx(n) for _, n, _ in ZUSATZ_CHOICES],
+                              state="readonly", width=breite)
         cb_zus.grid(row=6, column=0, columnspan=2, sticky="we")
 
         def on_zus(_e=None):
             sel = self._zus_var.get()
             for key, name, _ in ZUSATZ_CHOICES:
-                if name == sel:
+                if tx(name) == sel:
                     self._set_zusatz(key)
                     break
         cb_zus.bind("<<ComboboxSelected>>", on_zus)
 
         # --- Anzahl Balken ---
-        lbl("Höchstens so viele Balken", 7)
+        lbl(tx("setBalken"), 7)
         self._bal_var = tk.StringVar(value=str(self.max_balken))
         cb_bal = ttk.Combobox(win, textvariable=self._bal_var,
                               values=[str(n) for n in MAX_BALKEN_CHOICES],
-                              state="readonly", width=30)
+                              state="readonly", width=breite)
         cb_bal.grid(row=8, column=0, columnspan=2, sticky="we")
 
         def on_bal(_e=None):
@@ -987,7 +1840,7 @@ class TickerApp:
         cb_bal.bind("<<ComboboxSelected>>", on_bal)
 
         # --- Transparenz ---
-        lbl(f"Transparenz ({ALPHA_MIN}–{ALPHA_MAX} %)", 9)
+        lbl(tx("setAlpha", min=ALPHA_MIN, max=ALPHA_MAX), 9)
         self._alpha_var = tk.IntVar(value=self.alpha_pct)
 
         def on_alpha(_v=None):
@@ -1002,31 +1855,31 @@ class TickerApp:
                  length=230).grid(row=10, column=0, columnspan=2, sticky="we")
 
         # --- Mini-/Maxi-Modus ---
-        lbl("Mini-/Maxi-Modus", 11)
+        lbl(tx("setMiniMaxi"), 11)
         btn_frame = tk.Frame(win, bg=t["bg"])
         btn_frame.grid(row=12, column=0, columnspan=2, sticky="w")
-        tk.Button(btn_frame, text="Mini", width=8,
+        tk.Button(btn_frame, text=tx("mini"), width=8,
                   command=lambda: self._set_compact(True, from_user=True)
                   ).pack(side="left", padx=(0, 6))
-        tk.Button(btn_frame, text="Maxi", width=8,
+        tk.Button(btn_frame, text=tx("maxi"), width=8,
                   command=lambda: self._set_compact(False, from_user=True)
                   ).pack(side="left")
 
-        tk.Label(win, text="Nach Umschalten zurück nach:", fg=t["text"],
+        tk.Label(win, text=tx("setZurueck"), fg=t["text"],
                  bg=t["bg"], font=("Segoe UI", 8)).grid(
             row=13, column=0, columnspan=2, sticky="w", pady=(6, 2))
         self._dur_var = tk.StringVar(
-            value=next((n for n, s in COMPACT_DURATIONS
-                        if s == self.compact_duration), "dauerhaft"))
+            value=dauer_name(self.compact_duration
+                             if self.compact_duration in COMPACT_DURATIONS else None))
         cb_dur = ttk.Combobox(win, textvariable=self._dur_var,
-                              values=[n for n, _ in COMPACT_DURATIONS],
-                              state="readonly", width=30)
+                              values=[dauer_name(s) for s in COMPACT_DURATIONS],
+                              state="readonly", width=breite)
         cb_dur.grid(row=14, column=0, columnspan=2, sticky="we")
 
         def on_dur(_e=None):
             sel = self._dur_var.get()
-            for name, sec in COMPACT_DURATIONS:
-                if name == sel:
+            for sec in COMPACT_DURATIONS:
+                if dauer_name(sec) == sel:
                     self.compact_duration = sec
                     self.cfg["compact_duration"] = sec
                     save_config(self.cfg)
@@ -1034,10 +1887,11 @@ class TickerApp:
         cb_dur.bind("<<ComboboxSelected>>", on_dur)
 
         # --- Theme ---
-        lbl(f"Farben ({len(THEME_NAMES)} Varianten)", 15)
-        self._theme_var = tk.StringVar(value=self.theme_name)
+        lbl(tx("setFarben", n=len(THEME_NAMES)), 15)
+        self._theme_var = tk.StringVar(value=theme_anzeige(self.theme_name))
         cb_theme = ttk.Combobox(win, textvariable=self._theme_var,
-                                values=THEME_NAMES, state="readonly", width=30)
+                                values=[theme_anzeige(n) for n in THEME_NAMES],
+                                state="readonly", width=breite)
         cb_theme.grid(row=16, column=0, columnspan=2, sticky="we")
 
         def set_theme(name: str):
@@ -1054,9 +1908,11 @@ class TickerApp:
                 self._open_settings()
 
         cb_theme.bind("<<ComboboxSelected>>",
-                      lambda _e: set_theme(self._theme_var.get()))
+                      lambda _e: set_theme(next(
+                          (n for n in THEME_NAMES
+                           if theme_anzeige(n) == self._theme_var.get()), "")))
 
-        tk.Button(win, text="Schließen", command=win.destroy).grid(
+        tk.Button(win, text=tx("schliessen"), command=win.destroy).grid(
             row=17, column=0, columnspan=2, pady=(12, 0))
 
         tk.Label(win, text="© 2026 Dennis_mit_2n", fg=t["muted"], bg=t["bg"],
@@ -1090,6 +1946,21 @@ class TickerApp:
         self.apply_theme()
         if self.icon:
             self.icon.icon = self._tray_image()
+
+    def _set_sprache(self, code: str):
+        global SPRACHE
+        if code not in TEXTE or code == SPRACHE:
+            return
+        SPRACHE = code
+        self.cfg["sprache"] = code
+        save_config(self.cfg)
+        self._render()
+        self._build_tray()                  # Menübeschriftungen neu aufbauen
+        if self.settings_win is not None and self.settings_win.winfo_exists():
+            self.settings_win.destroy()
+            self.settings_win = None
+            self._open_settings()
+        self.wake_event.set()               # Statuszeile folgt mit dem nächsten Abruf
 
     # ---------- Worker ----------
 
@@ -1198,22 +2069,22 @@ class TickerApp:
                 if kind == "data":
                     self.daten = payload
                     self.status_lbl.config(
-                        text=datetime.now().strftime("aktualisiert %H:%M:%S"),
+                        text=tx("aktualisiert", zeit=datetime.now().strftime("%H:%M:%S")),
                         fg=self.th["muted"])
                     self._render()
                     if self.icon:
                         self.icon.icon = self._tray_image()
                 elif kind == "net_error":
                     self.status_lbl.config(
-                        text="Netzwerkfehler – neuer Versuch…",
+                        text=tx("netzFehler"),
                         fg="#ff9f43")
                 elif kind == "rate_limit":
-                    txt = "Rate-Limit (429) – Pause"
+                    txt = tx("ratePause")
                     if payload:
                         txt += f" {int(payload)}s"
                     self.status_lbl.config(text=txt, fg="#ff4d4d")
                 elif kind == "auth_error":
-                    self.status_lbl.config(text="Token ungültig!",
+                    self.status_lbl.config(text=tx("tokenUngueltig"),
                                            fg="#ff4d4d")
                     self._change_zugang_dialog()
                 elif kind == "change_zugang":
@@ -1230,6 +2101,8 @@ class TickerApp:
                     self._toggle_visible()
                 elif kind == "center":
                     self._center_overlay()
+                elif kind == "sprache":
+                    self._set_sprache(payload)
                 elif kind == "quit":
                     self.quit()
                     return
@@ -1344,6 +2217,15 @@ def selbsttest() -> int:
 
     pruefe("zahl", zahl_kurz(1234567), "1.234.567")
 
+    # Jede Sprache kennt jeden Text, und die Anzeige übersetzt die
+    # internen Beschriftungen.
+    for code, tabelle in TEXTE.items():
+        pruefe(f"texte {code}", sorted(set(TEXTE["de"]) - set(tabelle)), [])
+    pruefe("anzeige direkt", anzeige("(direkt)"), "(direkt)")
+    pruefe("anzeige start", anzeige("Startseite"), "Startseite")
+    pruefe("refresh standard", refresh_name(60), "60 s  (Standard)")
+    pruefe("refresh minuten", refresh_name(120), "2 min")
+
     if fehler:
         print("SELBSTTEST FEHLGESCHLAGEN:")
         for f in fehler:
@@ -1362,11 +2244,8 @@ if __name__ == "__main__":
     if not acquire_single_instance():
         _r = tk.Tk()
         _r.withdraw()
-        messagebox.showinfo(
-            "Besucher-Ticker",
-            "Der Ticker läuft bereits.\n\n"
-            "Das Fenster steckt im Infobereich der Taskleiste — "
-            "Rechtsklick aufs Symbol.")
+        SPRACHE = waehle_sprache(load_config())
+        messagebox.showinfo("Besucher-Ticker", tx("laeuftBereits"))
         _r.destroy()
         sys.exit(0)
     try:

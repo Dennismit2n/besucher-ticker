@@ -2,9 +2,9 @@
 
 **Your visitor numbers in view while you work.** A small floating readout for Windows that shows the numbers of your own [GoatCounter](https://www.goatcounter.com) site live: pageviews for the chosen period, visitors per page as bars, plus countries or referrers. Black, pink text, blue bars.
 
-![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-818cf8) ![Requires](https://img.shields.io/badge/Requires-your%20own%20GoatCounter%20account-4338ca) ![Language](https://img.shields.io/badge/Language-German-6366f1) ![License](https://img.shields.io/badge/License-MIT-a5b4fc)
+![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-818cf8) ![Requires](https://img.shields.io/badge/Requires-your%20own%20GoatCounter%20account-4338ca) ![Languages](https://img.shields.io/badge/Languages-14-6366f1) ![License](https://img.shields.io/badge/License-MIT-a5b4fc)
 
-[Deutsche Fassung](README.de.md) — the app itself speaks German.
+[Deutsche Fassung](README.de.md) · The app speaks 14 languages.
 
 ---
 
@@ -48,9 +48,9 @@ pythonw besucher_ticker.py
 |---|---|
 | Drag | move the overlay — the position is saved when you let go |
 | Double-click | switch between small and large |
-| Right-click the tray icon | overlay on/off, bring to centre, refresh now, period, extra block, settings, themes, change access, quit |
+| Right-click the tray icon | overlay on/off, bring to centre, refresh now, period, extra block, settings, themes, change access, language, quit |
 
-Overlay gone? **Bring to centre** in the menu. That happens when a second monitor was unplugged — the overlay is borderless and has no title bar to drag it back by.
+Overlay gone? **Bring overlay to centre** in the menu. That happens when a second monitor was unplugged — the overlay is borderless and has no title bar to drag it back by.
 
 ## Privacy
 
@@ -60,7 +60,7 @@ The token lives in `config.json` next to the program — encrypted via Windows D
 
 ## Under the hood
 
-One file, around 900 lines, three third-party packages (`requests`, `pystray`, `pillow`; `pywin32` optional) — everything else is the Python standard library.
+One file, around 2,300 lines, three third-party packages (`requests`, `pystray`, `pillow`; `pywin32` optional) — everything else is the Python standard library.
 
 - One refresh takes 3–4 requests, one after another. GoatCounter allows 4 per second — even the fastest setting (15 s) stays far below that, and there are deliberately no per-second settings.
 - The all-time total is fetched at most every 10 minutes: it changes slowly, and every query costs a request.

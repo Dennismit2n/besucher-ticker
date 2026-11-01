@@ -1,4 +1,4 @@
-Besucher-Ticker v1.0
+Besucher-Ticker v1.1
 ====================
 Overlay fuer die eigenen GoatCounter-Zahlen. Schwarz, pinke Schrift,
 blaue Balken.
@@ -41,7 +41,10 @@ Rechtsklick aufs Tray-Symbol:
    Overlay an/aus, Overlay zur Mitte holen, Jetzt aktualisieren,
    Zeitraum (heute / 7 Tage / 30 Tage / gesamt),
    Zusatzblock (aus / Laender / Verweise),
-   Einstellungen, Naechstes Theme, Zugang aendern, Beenden
+   Einstellungen, Naechstes Theme, Zugang aendern, Sprache, Beenden
+
+Sprache: Der Ticker spricht 14 Sprachen. Ohne eigene Wahl nimmt er
+die Anzeigesprache von Windows, sonst Englisch.
 
 
 WAS DIE ZAHLEN BEDEUTEN
