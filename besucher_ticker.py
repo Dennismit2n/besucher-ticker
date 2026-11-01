@@ -1,5 +1,5 @@
 """
-Besucher-Ticker v1.1.4 · GoatCounter-Overlay + System-Tray (Windows)
+Besucher-Ticker v1.1.5 · GoatCounter-Overlay + System-Tray (Windows)
 ==================================================================
 Zeigt die Besucherzahlen der eigenen GoatCounter-Seite live als
 schwebendes, halbtransparentes Overlay. An/Aus über das Tray-Icon.
@@ -100,7 +100,7 @@ LOCK_PATH = os.path.join(_BASE_DIR, ".besucher.lock")
 RETRY_BACKOFF = (10, 30, 60)          # Sekunden nach normalen Fehlern
 RATE_LIMIT_BACKOFF = (30, 120, 300)   # nach HTTP 429
 RATE_LIMIT_MAX_WAIT = 3600
-UA = "BesucherTicker/1.1.4 (personal read-only GoatCounter display)"
+UA = "BesucherTicker/1.1.5 (personal read-only GoatCounter display)"
 
 BAR_W, BAR_H = 190, 8
 
@@ -1202,6 +1202,30 @@ def normalisiere_site(eingabe: str) -> str:
     return s
 
 
+def titelleiste_dunkel(fenster: tk.Misc) -> None:
+    """Dunkle Titelleiste, sobald das Fenster zum ersten Mal erscheint. Ohne das bleibt sie
+    weiß, auch wenn Windows auf dunkel steht (DWMWA_USE_IMMERSIVE_DARK_MODE = 20,
+    Windows 10 ab 20H1 und Windows 11)."""
+    def setzen(e=None):
+        if e is not None and e.widget is not fenster:
+            return
+        try:
+            import ctypes
+            an = ctypes.c_int(1)
+            ctypes.windll.dwmapi.DwmSetWindowAttribute(int(fenster.wm_frame(), 16), 20,
+                                                       ctypes.byref(an), ctypes.sizeof(an))
+        except Exception:
+            pass
+    fenster.bind("<Map>", setzen, add="+")
+
+
+def knopf_farben(t: dict) -> dict:
+    """Dunkle tk.Button-Knöpfe in den Farben des Themes."""
+    return dict(bg=t["bar_bg"], fg=t["text"], activebackground=t["bar"], activeforeground="#ffffff",
+                relief=tk.FLAT, bd=0, highlightthickness=1, highlightbackground=t["muted"],
+                highlightcolor=t["title"], cursor="hand2")
+
+
 class Eingabe(simpledialog.Dialog):
     """Wie simpledialog.askstring, aber dunkel in den Farben des Tickers und mit Knöpfen
     in der eingestellten Sprache (Pythons eigener Dialog ist hellgrau und beschriftet
@@ -1218,7 +1242,7 @@ class Eingabe(simpledialog.Dialog):
         t = self.t
         self.configure(bg=t["bg"])
         master.configure(bg=t["bg"])
-        self.bind("<Map>", self._titelleiste_dunkel, add="+")
+        titelleiste_dunkel(self)
         tk.Label(master, text=self.frage, justify=tk.LEFT, fg=t["text"], bg=t["bg"]).grid(row=0, padx=5, sticky=tk.W)
         self.feld = tk.Entry(master, name="entry", bg=t["bar_bg"], fg=t["text"], insertbackground=t["title"],
                              selectbackground=t["bar"], selectforeground="#ffffff", relief=tk.FLAT,
@@ -1232,27 +1256,12 @@ class Eingabe(simpledialog.Dialog):
     def buttonbox(self):
         t = self.t
         box = tk.Frame(self, bg=t["bg"])
-        knopf = dict(width=10, bg=t["bar_bg"], fg=t["text"], activebackground=t["bar"],
-                     activeforeground="#ffffff", relief=tk.FLAT, bd=0, highlightthickness=1,
-                     highlightbackground=t["muted"], highlightcolor=t["title"], cursor="hand2")
+        knopf = dict(width=10, **knopf_farben(t))
         tk.Button(box, text=tx("ok"), command=self.ok, default=tk.ACTIVE, **knopf).pack(side=tk.LEFT, padx=5, pady=8)
         tk.Button(box, text=tx("abbrechen"), command=self.cancel, **knopf).pack(side=tk.LEFT, padx=5, pady=8)
         self.bind("<Return>", self.ok)
         self.bind("<Escape>", self.cancel)
         box.pack()
-
-    def _titelleiste_dunkel(self, e=None):
-        # Ohne das bleibt die Titelleiste weiß, auch wenn Windows auf dunkel steht.
-        # DWMWA_USE_IMMERSIVE_DARK_MODE = 20 (Windows 10 ab 20H1 und Windows 11).
-        if e is not None and e.widget is not self:
-            return
-        try:
-            import ctypes
-            an = ctypes.c_int(1)
-            ctypes.windll.dwmapi.DwmSetWindowAttribute(int(self.wm_frame(), 16), 20,
-                                                       ctypes.byref(an), ctypes.sizeof(an))
-        except Exception:
-            pass
 
     def apply(self):
         self.result = self.feld.get()
@@ -1815,6 +1824,7 @@ class TickerApp:
         win.attributes("-topmost", True)
         win.resizable(False, False)
         win.geometry(f"+{self.root.winfo_x() + 40}+{self.root.winfo_y() + 40}")
+        titelleiste_dunkel(win)
 
         def lbl(text, row, pady=(8, 2)):
             tk.Label(win, text=text, fg=t["title"], bg=t["bg"],
@@ -1826,6 +1836,22 @@ class TickerApp:
             style.theme_use("clam")
         except tk.TclError:
             pass
+        # Auswahllisten dunkel: Feld, Pfeil und die aufgeklappte Liste (ein tk.Listbox,
+        # der nur über die Optionsdatenbank Farben bekommt)
+        style.configure("TCombobox", fieldbackground=t["bar_bg"], background=t["bar_bg"],
+                        foreground=t["text"], arrowcolor=t["title"], bordercolor=t["muted"],
+                        lightcolor=t["bar_bg"], darkcolor=t["bar_bg"], insertcolor=t["title"])
+        style.map("TCombobox",
+                  fieldbackground=[("readonly", t["bar_bg"])],
+                  foreground=[("readonly", t["text"])],
+                  background=[("pressed", t["bar"]), ("active", t["bar"])],
+                  arrowcolor=[("pressed", "#ffffff"), ("active", "#ffffff")],
+                  selectbackground=[("readonly", t["bar_bg"])],
+                  selectforeground=[("readonly", t["text"])])
+        win.option_add("*TCombobox*Listbox.background", t["bar_bg"])
+        win.option_add("*TCombobox*Listbox.foreground", t["text"])
+        win.option_add("*TCombobox*Listbox.selectBackground", t["bar"])
+        win.option_add("*TCombobox*Listbox.selectForeground", "#ffffff")
 
         # Auswahllisten 30 Zeichen breit wie bisher, breiter nur, wenn ein
         # Eintrag in der gewählten Sprache sonst abgeschnitten würde.
@@ -1928,6 +1954,7 @@ class TickerApp:
         tk.Scale(win, from_=ALPHA_MIN, to=ALPHA_MAX, orient="horizontal",
                  variable=self._alpha_var, command=on_alpha, bg=t["bg"],
                  fg=t["text"], troughcolor=t["bar_bg"], highlightthickness=0,
+                 activebackground=t["bar"],
                  length=230).grid(row=10, column=0, columnspan=2, sticky="we")
 
         # --- Mini-/Maxi-Modus ---
@@ -1935,11 +1962,11 @@ class TickerApp:
         btn_frame = tk.Frame(win, bg=t["bg"])
         btn_frame.grid(row=12, column=0, columnspan=2, sticky="w")
         tk.Button(btn_frame, text=tx("mini"), width=8,
-                  command=lambda: self._set_compact(True, from_user=True)
-                  ).pack(side="left", padx=(0, 6))
+                  command=lambda: self._set_compact(True, from_user=True),
+                  **knopf_farben(t)).pack(side="left", padx=(0, 6))
         tk.Button(btn_frame, text=tx("maxi"), width=8,
-                  command=lambda: self._set_compact(False, from_user=True)
-                  ).pack(side="left")
+                  command=lambda: self._set_compact(False, from_user=True),
+                  **knopf_farben(t)).pack(side="left")
 
         tk.Label(win, text=tx("setZurueck"), fg=t["text"],
                  bg=t["bg"], font=("Segoe UI", 8)).grid(
@@ -1988,8 +2015,8 @@ class TickerApp:
                           (n for n in THEME_NAMES
                            if theme_anzeige(n) == self._theme_var.get()), "")))
 
-        tk.Button(win, text=tx("schliessen"), command=win.destroy).grid(
-            row=17, column=0, columnspan=2, pady=(12, 0))
+        tk.Button(win, text=tx("schliessen"), command=win.destroy, width=12,
+                  **knopf_farben(t)).grid(row=17, column=0, columnspan=2, pady=(12, 0))
 
         tk.Label(win, text="© 2026 Dennis_mit_2n", fg=t["muted"], bg=t["bg"],
                  font=("Segoe UI", 8)).grid(
