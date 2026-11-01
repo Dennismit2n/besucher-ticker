@@ -1,5 +1,5 @@
 """
-Besucher-Ticker v1.1.1 · GoatCounter-Overlay + System-Tray (Windows)
+Besucher-Ticker v1.1.2 · GoatCounter-Overlay + System-Tray (Windows)
 ==================================================================
 Zeigt die Besucherzahlen der eigenen GoatCounter-Seite live als
 schwebendes, halbtransparentes Overlay. An/Aus über das Tray-Icon.
@@ -100,7 +100,7 @@ LOCK_PATH = os.path.join(_BASE_DIR, ".besucher.lock")
 RETRY_BACKOFF = (10, 30, 60)          # Sekunden nach normalen Fehlern
 RATE_LIMIT_BACKOFF = (30, 120, 300)   # nach HTTP 429
 RATE_LIMIT_MAX_WAIT = 3600
-UA = "BesucherTicker/1.1.1 (personal read-only GoatCounter display)"
+UA = "BesucherTicker/1.1.2 (personal read-only GoatCounter display)"
 
 BAR_W, BAR_H = 190, 8
 
@@ -243,6 +243,8 @@ TEXTE: dict[str, dict[str, str]] = {
         "setZurueck": "Nach Umschalten zurück nach:",
         "setFarben": "Farben ({n} Varianten)",
         "schliessen": "Schließen",
+        "ok": "OK",
+        "abbrechen": "Abbrechen",
         "aktualisiert": "aktualisiert {zeit}",
         "netzFehler": "Netzwerkfehler, neuer Versuch…",
         "ratePause": "Rate-Limit (429), Pause",
@@ -298,6 +300,8 @@ TEXTE: dict[str, dict[str, str]] = {
         "setZurueck": "Switch back after:",
         "setFarben": "Colours ({n} variants)",
         "schliessen": "Close",
+        "ok": "OK",
+        "abbrechen": "Cancel",
         "aktualisiert": "updated {zeit}",
         "netzFehler": "Network error, retrying…",
         "ratePause": "Rate limit (429), pausing",
@@ -353,6 +357,8 @@ TEXTE: dict[str, dict[str, str]] = {
         "setZurueck": "Volver tras:",
         "setFarben": "Colores ({n} variantes)",
         "schliessen": "Cerrar",
+        "ok": "Aceptar",
+        "abbrechen": "Cancelar",
         "aktualisiert": "actualizado {zeit}",
         "netzFehler": "Error de red, reintentando…",
         "ratePause": "Límite de peticiones (429), pausa",
@@ -408,6 +414,8 @@ TEXTE: dict[str, dict[str, str]] = {
         "setZurueck": "Revenir après :",
         "setFarben": "Couleurs ({n} variantes)",
         "schliessen": "Fermer",
+        "ok": "OK",
+        "abbrechen": "Annuler",
         "aktualisiert": "mis à jour {zeit}",
         "netzFehler": "Erreur réseau, nouvel essai…",
         "ratePause": "Limite de requêtes (429), pause",
@@ -463,6 +471,8 @@ TEXTE: dict[str, dict[str, str]] = {
         "setZurueck": "Torna indietro dopo:",
         "setFarben": "Colori ({n} varianti)",
         "schliessen": "Chiudi",
+        "ok": "OK",
+        "abbrechen": "Annulla",
         "aktualisiert": "aggiornato {zeit}",
         "netzFehler": "Errore di rete, nuovo tentativo…",
         "ratePause": "Limite di richieste (429), pausa",
@@ -518,6 +528,8 @@ TEXTE: dict[str, dict[str, str]] = {
         "setZurueck": "Terugschakelen na:",
         "setFarben": "Kleuren ({n} varianten)",
         "schliessen": "Sluiten",
+        "ok": "OK",
+        "abbrechen": "Annuleren",
         "aktualisiert": "bijgewerkt {zeit}",
         "netzFehler": "Netwerkfout, nieuwe poging…",
         "ratePause": "Limiet bereikt (429), pauze",
@@ -573,6 +585,8 @@ TEXTE: dict[str, dict[str, str]] = {
         "setZurueck": "Wróć po:",
         "setFarben": "Kolory (warianty: {n})",
         "schliessen": "Zamknij",
+        "ok": "OK",
+        "abbrechen": "Anuluj",
         "aktualisiert": "aktualizacja {zeit}",
         "netzFehler": "Błąd sieci, ponawiam…",
         "ratePause": "Limit zapytań (429), przerwa",
@@ -628,6 +642,8 @@ TEXTE: dict[str, dict[str, str]] = {
         "setZurueck": "Voltar depois de:",
         "setFarben": "Cores ({n} variantes)",
         "schliessen": "Fechar",
+        "ok": "OK",
+        "abbrechen": "Cancelar",
         "aktualisiert": "atualizado {zeit}",
         "netzFehler": "Erro de rede, tentando de novo…",
         "ratePause": "Limite de requisições (429), pausa",
@@ -683,6 +699,8 @@ TEXTE: dict[str, dict[str, str]] = {
         "setZurueck": "Şu süre sonra geri dön:",
         "setFarben": "Renkler ({n} çeşit)",
         "schliessen": "Kapat",
+        "ok": "Tamam",
+        "abbrechen": "İptal",
         "aktualisiert": "güncellendi {zeit}",
         "netzFehler": "Ağ hatası, yeniden deneniyor…",
         "ratePause": "İstek sınırı (429), mola",
@@ -738,6 +756,8 @@ TEXTE: dict[str, dict[str, str]] = {
         "setZurueck": "Вернуть через:",
         "setFarben": "Цвета (вариантов: {n})",
         "schliessen": "Закрыть",
+        "ok": "ОК",
+        "abbrechen": "Отмена",
         "aktualisiert": "обновлено {zeit}",
         "netzFehler": "Ошибка сети, повтор…",
         "ratePause": "Лимит запросов (429), пауза",
@@ -793,6 +813,8 @@ TEXTE: dict[str, dict[str, str]] = {
         "setZurueck": "इतने बाद वापस जाएँ:",
         "setFarben": "रंग ({n} प्रकार)",
         "schliessen": "बंद करें",
+        "ok": "ठीक है",
+        "abbrechen": "रद्द करें",
         "aktualisiert": "अपडेट {zeit}",
         "netzFehler": "नेटवर्क त्रुटि, फिर से कोशिश…",
         "ratePause": "अनुरोध सीमा (429), विराम",
@@ -848,6 +870,8 @@ TEXTE: dict[str, dict[str, str]] = {
         "setZurueck": "切换后多久恢复：",
         "setFarben": "颜色（{n} 种）",
         "schliessen": "关闭",
+        "ok": "确定",
+        "abbrechen": "取消",
         "aktualisiert": "更新于 {zeit}",
         "netzFehler": "网络错误，正在重试…",
         "ratePause": "请求超限 (429)，暂停",
@@ -903,6 +927,8 @@ TEXTE: dict[str, dict[str, str]] = {
         "setZurueck": "切り替え後に戻すまで：",
         "setFarben": "色（{n} 種類）",
         "schliessen": "閉じる",
+        "ok": "OK",
+        "abbrechen": "キャンセル",
         "aktualisiert": "更新 {zeit}",
         "netzFehler": "ネットワークエラー、再試行中…",
         "ratePause": "リクエスト上限 (429)、一時停止",
@@ -958,6 +984,8 @@ TEXTE: dict[str, dict[str, str]] = {
         "setZurueck": "전환 후 되돌릴 시간:",
         "setFarben": "색상 ({n}가지)",
         "schliessen": "닫기",
+        "ok": "확인",
+        "abbrechen": "취소",
         "aktualisiert": "업데이트 {zeit}",
         "netzFehler": "네트워크 오류, 다시 시도 중…",
         "ratePause": "요청 한도 (429), 잠시 멈춤",
@@ -1174,18 +1202,43 @@ def normalisiere_site(eingabe: str) -> str:
     return s
 
 
+class Eingabe(simpledialog.Dialog):
+    """Wie simpledialog.askstring, aber die Knöpfe sprechen die eingestellte Sprache
+    (Pythons eigener Dialog beschriftet fest mit "OK" und "Cancel")."""
+
+    def __init__(self, parent: tk.Misc, titel: str, frage: str, vorgabe: str = ""):
+        self.frage = frage
+        self.vorgabe = vorgabe
+        super().__init__(parent, titel)
+
+    def body(self, master):
+        tk.Label(master, text=self.frage, justify=tk.LEFT).grid(row=0, padx=5, sticky=tk.W)
+        self.feld = tk.Entry(master, name="entry")
+        self.feld.grid(row=1, padx=5, sticky=tk.W + tk.E)
+        if self.vorgabe:
+            self.feld.insert(0, self.vorgabe)
+            self.feld.select_range(0, tk.END)
+        return self.feld
+
+    def buttonbox(self):
+        box = tk.Frame(self)
+        tk.Button(box, text=tx("ok"), width=10, command=self.ok, default=tk.ACTIVE).pack(side=tk.LEFT, padx=5, pady=5)
+        tk.Button(box, text=tx("abbrechen"), width=10, command=self.cancel).pack(side=tk.LEFT, padx=5, pady=5)
+        self.bind("<Return>", self.ok)
+        self.bind("<Escape>", self.cancel)
+        box.pack()
+
+    def apply(self):
+        self.result = self.feld.get()
+
+
 def ask_site(parent: tk.Tk | None = None, vorgabe: str = "") -> str | None:
     own_root = False
     if parent is None:
         parent = tk.Tk()
         parent.withdraw()
         own_root = True
-    wert = simpledialog.askstring(
-        "Besucher-Ticker",
-        tx("frageSite"),
-        initialvalue=vorgabe,
-        parent=parent,
-    )
+    wert = Eingabe(parent, "Besucher-Ticker", tx("frageSite"), vorgabe).result
     if own_root:
         parent.destroy()
     return normalisiere_site(wert) or None
@@ -1198,11 +1251,7 @@ def ask_token(parent: tk.Tk | None = None) -> str | None:
         parent = tk.Tk()
         parent.withdraw()
         own_root = True
-    token = simpledialog.askstring(
-        "Besucher-Ticker",
-        tx("frageToken"),
-        parent=parent,
-    )
+    token = Eingabe(parent, "Besucher-Ticker", tx("frageToken")).result
     if own_root:
         parent.destroy()
     if token:
