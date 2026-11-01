@@ -1,5 +1,5 @@
 """
-Besucher-Ticker v1.1.3 · GoatCounter-Overlay + System-Tray (Windows)
+Besucher-Ticker v1.1.4 · GoatCounter-Overlay + System-Tray (Windows)
 ==================================================================
 Zeigt die Besucherzahlen der eigenen GoatCounter-Seite live als
 schwebendes, halbtransparentes Overlay. An/Aus über das Tray-Icon.
@@ -19,7 +19,7 @@ Installation (einmalig):
 
 API-Token besorgen (einmalig):
     1. Auf der eigenen GoatCounter-Seite anmelden
-       (z. B. https://dennis-mit-2n.goatcounter.com)
+       (z. B. https://deinname.goatcounter.com)
     2. Oben rechts auf den Benutzernamen → "API"
     3. "Add new token" — Name frei wählbar, Häkchen bei
        "Read statistics" genügt. Mehr Rechte braucht der Ticker nicht.
@@ -100,7 +100,7 @@ LOCK_PATH = os.path.join(_BASE_DIR, ".besucher.lock")
 RETRY_BACKOFF = (10, 30, 60)          # Sekunden nach normalen Fehlern
 RATE_LIMIT_BACKOFF = (30, 120, 300)   # nach HTTP 429
 RATE_LIMIT_MAX_WAIT = 3600
-UA = "BesucherTicker/1.1.3 (personal read-only GoatCounter display)"
+UA = "BesucherTicker/1.1.4 (personal read-only GoatCounter display)"
 
 BAR_W, BAR_H = 190, 8
 
@@ -218,7 +218,7 @@ TEXTE: dict[str, dict[str, str]] = {
         "themeSPB": "Schwarz / Pink / Blau",
         "themeSPE": "Schwarz / Pink / Eisblau",
         "themeTMI": "Tiefschwarz / Magenta / Indigo",
-        "frageSite": "Adresse der GoatCounter-Seite:\n(z. B. dennis-mit-2n  oder  dennis-mit-2n.goatcounter.com)",
+        "frageSite": "Adresse der GoatCounter-Seite:\n(z. B. deinname  oder  deinname.goatcounter.com)",
         "frageToken": "API-Token einfügen\n(GoatCounter → Benutzername oben rechts → API →\n\"Add new token\", Recht \"Read statistics\" genügt):",
         "mOverlay": "Overlay an/aus",
         "mMitte": "Overlay zur Mitte holen",
@@ -275,7 +275,7 @@ TEXTE: dict[str, dict[str, str]] = {
         "themeSPB": "Black / Pink / Blue",
         "themeSPE": "Black / Pink / Ice blue",
         "themeTMI": "Deep black / Magenta / Indigo",
-        "frageSite": "Address of the GoatCounter site:\n(e.g. dennis-mit-2n  or  dennis-mit-2n.goatcounter.com)",
+        "frageSite": "Address of the GoatCounter site:\n(e.g. yourname  or  yourname.goatcounter.com)",
         "frageToken": "Paste the API token\n(GoatCounter → user name at the top right → API →\n“Add new token”, the “Read statistics” permission is enough):",
         "mOverlay": "Show/hide overlay",
         "mMitte": "Bring overlay to centre",
@@ -332,7 +332,7 @@ TEXTE: dict[str, dict[str, str]] = {
         "themeSPB": "Negro / Rosa / Azul",
         "themeSPE": "Negro / Rosa / Azul hielo",
         "themeTMI": "Negro intenso / Magenta / Índigo",
-        "frageSite": "Dirección del sitio de GoatCounter:\n(p. ej. dennis-mit-2n  o  dennis-mit-2n.goatcounter.com)",
+        "frageSite": "Dirección del sitio de GoatCounter:\n(p. ej. tunombre  o  tunombre.goatcounter.com)",
         "frageToken": "Pega el token de la API\n(GoatCounter → nombre de usuario arriba a la derecha → API →\n«Add new token»; basta con el permiso «Read statistics»):",
         "mOverlay": "Mostrar/ocultar overlay",
         "mMitte": "Traer el overlay al centro",
@@ -389,7 +389,7 @@ TEXTE: dict[str, dict[str, str]] = {
         "themeSPB": "Noir / Rose / Bleu",
         "themeSPE": "Noir / Rose / Bleu glacier",
         "themeTMI": "Noir profond / Magenta / Indigo",
-        "frageSite": "Adresse du site GoatCounter :\n(p. ex. dennis-mit-2n  ou  dennis-mit-2n.goatcounter.com)",
+        "frageSite": "Adresse du site GoatCounter :\n(p. ex. votrenom  ou  votrenom.goatcounter.com)",
         "frageToken": "Collez le jeton d’API\n(GoatCounter → nom d’utilisateur en haut à droite → API →\n« Add new token », le droit « Read statistics » suffit) :",
         "mOverlay": "Afficher/masquer l’overlay",
         "mMitte": "Ramener l’overlay au centre",
@@ -446,7 +446,7 @@ TEXTE: dict[str, dict[str, str]] = {
         "themeSPB": "Nero / Rosa / Blu",
         "themeSPE": "Nero / Rosa / Azzurro ghiaccio",
         "themeTMI": "Nero profondo / Magenta / Indaco",
-        "frageSite": "Indirizzo del sito GoatCounter:\n(per es. dennis-mit-2n  o  dennis-mit-2n.goatcounter.com)",
+        "frageSite": "Indirizzo del sito GoatCounter:\n(per es. tuonome  o  tuonome.goatcounter.com)",
         "frageToken": "Incolla il token API\n(GoatCounter → nome utente in alto a destra → API →\n«Add new token», basta il permesso «Read statistics»):",
         "mOverlay": "Mostra/nascondi overlay",
         "mMitte": "Riporta l’overlay al centro",
@@ -503,7 +503,7 @@ TEXTE: dict[str, dict[str, str]] = {
         "themeSPB": "Zwart / Roze / Blauw",
         "themeSPE": "Zwart / Roze / IJsblauw",
         "themeTMI": "Diepzwart / Magenta / Indigo",
-        "frageSite": "Adres van de GoatCounter-site:\n(bijv. dennis-mit-2n  of  dennis-mit-2n.goatcounter.com)",
+        "frageSite": "Adres van de GoatCounter-site:\n(bijv. jouwnaam  of  jouwnaam.goatcounter.com)",
         "frageToken": "API-token plakken\n(GoatCounter → gebruikersnaam rechtsboven → API →\n‘Add new token’, het recht ‘Read statistics’ is genoeg):",
         "mOverlay": "Overlay tonen/verbergen",
         "mMitte": "Overlay naar het midden halen",
@@ -560,7 +560,7 @@ TEXTE: dict[str, dict[str, str]] = {
         "themeSPB": "Czarny / Różowy / Niebieski",
         "themeSPE": "Czarny / Różowy / Lodowy błękit",
         "themeTMI": "Głęboka czerń / Magenta / Indygo",
-        "frageSite": "Adres strony GoatCounter:\n(np. dennis-mit-2n  lub  dennis-mit-2n.goatcounter.com)",
+        "frageSite": "Adres strony GoatCounter:\n(np. twojanazwa  lub  twojanazwa.goatcounter.com)",
         "frageToken": "Wklej token API\n(GoatCounter → nazwa użytkownika w prawym górnym rogu → API →\n„Add new token”, wystarczy uprawnienie „Read statistics”):",
         "mOverlay": "Pokaż/ukryj nakładkę",
         "mMitte": "Przenieś nakładkę na środek",
@@ -617,7 +617,7 @@ TEXTE: dict[str, dict[str, str]] = {
         "themeSPB": "Preto / Rosa / Azul",
         "themeSPE": "Preto / Rosa / Azul-gelo",
         "themeTMI": "Preto profundo / Magenta / Índigo",
-        "frageSite": "Endereço do site no GoatCounter:\n(ex.: dennis-mit-2n  ou  dennis-mit-2n.goatcounter.com)",
+        "frageSite": "Endereço do site no GoatCounter:\n(ex.: seunome  ou  seunome.goatcounter.com)",
         "frageToken": "Cole o token da API\n(GoatCounter → nome de usuário no canto superior direito → API →\n«Add new token», a permissão «Read statistics» basta):",
         "mOverlay": "Mostrar/ocultar overlay",
         "mMitte": "Trazer o overlay para o centro",
@@ -674,7 +674,7 @@ TEXTE: dict[str, dict[str, str]] = {
         "themeSPB": "Siyah / Pembe / Mavi",
         "themeSPE": "Siyah / Pembe / Buz mavisi",
         "themeTMI": "Koyu siyah / Macenta / Çivit",
-        "frageSite": "GoatCounter sitesinin adresi:\n(örn. dennis-mit-2n  veya  dennis-mit-2n.goatcounter.com)",
+        "frageSite": "GoatCounter sitesinin adresi:\n(örn. adiniz  veya  adiniz.goatcounter.com)",
         "frageToken": "API anahtarını yapıştırın\n(GoatCounter → sağ üstte kullanıcı adı → API →\n“Add new token”, “Read statistics” izni yeterli):",
         "mOverlay": "Katmanı göster/gizle",
         "mMitte": "Katmanı ortaya getir",
@@ -731,7 +731,7 @@ TEXTE: dict[str, dict[str, str]] = {
         "themeSPB": "Чёрный / Розовый / Синий",
         "themeSPE": "Чёрный / Розовый / Ледяной синий",
         "themeTMI": "Глубокий чёрный / Пурпурный / Индиго",
-        "frageSite": "Адрес сайта в GoatCounter:\n(напр. dennis-mit-2n  или  dennis-mit-2n.goatcounter.com)",
+        "frageSite": "Адрес сайта в GoatCounter:\n(напр. yourname  или  yourname.goatcounter.com)",
         "frageToken": "Вставьте токен API\n(GoatCounter → имя пользователя справа вверху → API →\n«Add new token», достаточно права «Read statistics»):",
         "mOverlay": "Показать/скрыть оверлей",
         "mMitte": "Вернуть оверлей в центр",
@@ -788,7 +788,7 @@ TEXTE: dict[str, dict[str, str]] = {
         "themeSPB": "काला / गुलाबी / नीला",
         "themeSPE": "काला / गुलाबी / बर्फ़ीला नीला",
         "themeTMI": "गहरा काला / मैजेंटा / इंडिगो",
-        "frageSite": "GoatCounter साइट का पता:\n(जैसे dennis-mit-2n  या  dennis-mit-2n.goatcounter.com)",
+        "frageSite": "GoatCounter साइट का पता:\n(जैसे yourname  या  yourname.goatcounter.com)",
         "frageToken": "API टोकन चिपकाएँ\n(GoatCounter → ऊपर दाईं ओर उपयोगकर्ता नाम → API →\n“Add new token”, “Read statistics” अनुमति काफ़ी है):",
         "mOverlay": "ओवरले दिखाएँ/छिपाएँ",
         "mMitte": "ओवरले को बीच में लाएँ",
@@ -845,7 +845,7 @@ TEXTE: dict[str, dict[str, str]] = {
         "themeSPB": "黑 / 粉 / 蓝",
         "themeSPE": "黑 / 粉 / 冰蓝",
         "themeTMI": "深黑 / 品红 / 靛蓝",
-        "frageSite": "GoatCounter 站点地址：\n（例如 dennis-mit-2n  或  dennis-mit-2n.goatcounter.com）",
+        "frageSite": "GoatCounter 站点地址：\n（例如 yourname  或  yourname.goatcounter.com）",
         "frageToken": "粘贴 API 令牌\n（GoatCounter → 右上角的用户名 → API →\n“Add new token”，有“Read statistics”权限就够了）：",
         "mOverlay": "显示/隐藏悬浮窗",
         "mMitte": "把悬浮窗移到屏幕中央",
@@ -902,7 +902,7 @@ TEXTE: dict[str, dict[str, str]] = {
         "themeSPB": "黒 / ピンク / 青",
         "themeSPE": "黒 / ピンク / アイスブルー",
         "themeTMI": "漆黒 / マゼンタ / インディゴ",
-        "frageSite": "GoatCounter サイトのアドレス：\n（例：dennis-mit-2n  または  dennis-mit-2n.goatcounter.com）",
+        "frageSite": "GoatCounter サイトのアドレス：\n（例：yourname  または  yourname.goatcounter.com）",
         "frageToken": "API トークンを貼り付けてください\n（GoatCounter → 右上のユーザー名 → API →\n「Add new token」。「Read statistics」の権限で十分です）：",
         "mOverlay": "オーバーレイの表示/非表示",
         "mMitte": "オーバーレイを中央に戻す",
@@ -959,7 +959,7 @@ TEXTE: dict[str, dict[str, str]] = {
         "themeSPB": "검정 / 분홍 / 파랑",
         "themeSPE": "검정 / 분홍 / 얼음 파랑",
         "themeTMI": "깊은 검정 / 자홍 / 남색",
-        "frageSite": "GoatCounter 사이트 주소:\n(예: dennis-mit-2n  또는  dennis-mit-2n.goatcounter.com)",
+        "frageSite": "GoatCounter 사이트 주소:\n(예: yourname  또는  yourname.goatcounter.com)",
         "frageToken": "API 토큰을 붙여 넣으세요\n(GoatCounter → 오른쪽 위 사용자 이름 → API →\n‘Add new token’, ‘Read statistics’ 권한이면 충분합니다):",
         "mOverlay": "오버레이 표시/숨기기",
         "mMitte": "오버레이를 가운데로",
@@ -1186,7 +1186,7 @@ def clamp_to_screen(x: int, y: int, w: int = 240, h: int = 140) -> tuple[int, in
 
 
 def normalisiere_site(eingabe: str) -> str:
-    """Nimmt 'dennis-mit-2n', 'dennis-mit-2n.goatcounter.com' oder die
+    """Nimmt 'deinname', 'deinname.goatcounter.com' oder die
     volle URL entgegen und liefert immer die Basis-URL ohne Schrägstrich
     am Ende."""
     s = (eingabe or "").strip()
@@ -2285,11 +2285,11 @@ def selbsttest() -> int:
     pruefe("gesamt start", sg, ALLTIME_START)
 
     # Adress-Normalisierung
-    for eingabe in ("dennis-mit-2n", "dennis-mit-2n.goatcounter.com",
-                    "https://dennis-mit-2n.goatcounter.com/",
-                    "http://dennis-mit-2n.goatcounter.com"):
+    for eingabe in ("deinname", "deinname.goatcounter.com",
+                    "https://deinname.goatcounter.com/",
+                    "http://deinname.goatcounter.com"):
         pruefe(f"site {eingabe}", normalisiere_site(eingabe),
-               "https://dennis-mit-2n.goatcounter.com")
+               "https://deinname.goatcounter.com")
 
     pruefe("zahl", zahl_kurz(1234567), "1.234.567")
 
