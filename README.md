@@ -6,31 +6,33 @@
 
 [Deutsche Fassung](README.de.md) · The app speaks 14 languages.
 
+<img src="assets/screenshot-en.png" alt="The Besucher-Ticker overlay with sample numbers: the big pageview count of the last 7 days at the top, today’s and the all-time value beside it, below that six blue bars for visitors per tool, then the countries and the time of the last refresh." width="210">
+
 ---
 
 ## What for
 
-The GoatCounter dashboard is for sitting down and looking at. This readout is for running alongside: it sits in a corner of your screen and answers, without you opening any page — *how many people came, and where were they?*
+The GoatCounter dashboard is for sitting down and looking at. This readout is for running alongside: it sits in a corner of your screen and answers, without you opening any page: *How many people came, and where were they?*
 
 ## Requirement
 
-A website of your own that counts with GoatCounter. The ticker does not count anything itself — it displays what your GoatCounter account already knows. Without an account it consequently shows nothing at all.
+A website of your own that counts with GoatCounter. The ticker does not count anything itself, it displays what your GoatCounter account already knows. Without an account it consequently shows nothing at all.
 
 ## What it shows
 
 | | |
 |---|---|
 | **Pageviews** | the big number: pageviews for the chosen period (today / 7 days / 30 days / all time), with today’s and the all-time value beside it |
-| **Bars** | visitors per page — subpages are folded into their page instead of appearing separately |
+| **Bars** | visitors per page. Subpages are folded into their page instead of appearing separately |
 | **Extra block** | countries or referrers, or off |
 
-**The bars do not add up to the big number — on purpose.** GoatCounter tracks two different quantities: *pageviews* (how often something was opened) and *visitors* (how many people came). The ticker does not mix them, and the labels keep them apart.
+**The bars do not add up to the big number, on purpose.** GoatCounter tracks two different quantities: *pageviews* (how often something was opened) and *visitors* (how many people came). The ticker does not mix them, and the labels keep them apart.
 
 Click events (GoatCounter’s `data-count` events) are filtered out of the bars. Otherwise a single click would count twice: once as a pageview and once as an event.
 
 ## Getting started
 
-**With the prebuilt exe** — download it from the [releases](../../releases/latest), put it anywhere, double-click. On first start Windows will say "unknown publisher": the file is not signed, which costs money. Continue via **More info → Run anyway**.
+**With the prebuilt exe:** download it from the [releases](../../releases/latest), put it anywhere, double-click. On first start Windows will say "unknown publisher": the file is not signed, which costs money. Continue via **More info → Run anyway**.
 
 **From source:**
 
@@ -40,36 +42,36 @@ pip install pywin32        (optional, encrypts the token)
 pythonw besucher_ticker.py
 ```
 
-**On first start** the ticker asks for two things: the address of your GoatCounter site (`yourname` is enough) and an API token. You create the token on your GoatCounter site: username in the top right → **API** → **Add new token**. Ticking **Read statistics** is enough — the ticker needs no more rights, and fewer rights can do less harm should the token ever get out.
+**On first start** the ticker asks for two things: the address of your GoatCounter site (`yourname` is enough) and an API token. You create the token on your GoatCounter site: username in the top right → **API** → **Add new token**. Ticking **Read statistics** is enough. The ticker needs no more rights, and fewer rights can do less harm should the token ever get out.
 
 ## Controls
 
 | | |
 |---|---|
-| Drag | move the overlay — the position is saved when you let go |
+| Drag | move the overlay, the position is saved when you let go |
 | Double-click | switch between small and large |
 | Right-click the tray icon | overlay on/off, bring to centre, refresh now, period, extra block, settings, themes, change access, language, quit |
 
-Overlay gone? **Bring overlay to centre** in the menu. That happens when a second monitor was unplugged — the overlay is borderless and has no title bar to drag it back by.
+Overlay gone? **Bring overlay to centre** in the menu. That happens when a second monitor was unplugged: the overlay is borderless and has no title bar to drag it back by.
 
 ## Privacy
 
 **The ticker talks to exactly one address: your own GoatCounter site.** Read-only requests, no telemetry, no update check, no identifier.
 
-The token lives in `config.json` next to the program — encrypted via Windows DPAPI when `pywin32` is installed, bound to your user account and your machine. Without `pywin32` it sits there in plain text; the program still runs, but you should know. Either way: the file stays local and does not belong in any backup others can read.
+The token lives in `config.json` next to the program, encrypted via Windows DPAPI when `pywin32` is installed, bound to your user account and your machine. Without `pywin32` it sits there in plain text; the program still runs, but you should know. Either way: the file stays local and does not belong in any backup others can read.
 
 ## Under the hood
 
-One file, around 2,300 lines, three third-party packages (`requests`, `pystray`, `pillow`; `pywin32` optional) — everything else is the Python standard library.
+One file, around 2,400 lines, three third-party packages (`requests`, `pystray`, `pillow`; `pywin32` optional), everything else is the Python standard library.
 
-- One refresh takes 3–4 requests, one after another. GoatCounter allows 4 per second — even the fastest setting (15 s) stays far below that, and there are deliberately no per-second settings.
+- One refresh takes 3 to 4 requests, one after another. GoatCounter allows 4 per second. Even the fastest setting (15 s) stays far below that, and there are deliberately no per-second settings.
 - The all-time total is fetched at most every 10 minutes: it changes slowly, and every query costs a request.
-- On HTTP 429 the ticker waits as long as the server asks — GoatCounter reports that in the `X-Rate-Limit-Reset` header, with `Retry-After` as the fallback.
+- On HTTP 429 the ticker waits as long as the server asks. GoatCounter reports that in the `X-Rate-Limit-Reset` header, with `Retry-After` as the fallback.
 - `python besucher_ticker.py --selbsttest` checks the arithmetic and mapping logic without network and without a window.
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT, see [LICENSE](LICENSE).
 
 ---
 
