@@ -1,6 +1,6 @@
 # Besucher-Ticker 📊
 
-**Deine Besucherzahlen im Blick, während du arbeitest.** Eine kleine schwebende Anzeige für Windows, die die Zahlen der eigenen [GoatCounter](https://www.goatcounter.com)-Seite live zeigt: Aufrufe im gewählten Zeitraum, Besucher je Seite als Balken, dazu Länder oder Verweise. Schwarz, pinke Schrift, blaue Balken.
+**Deine Besucherzahlen im Blick, während du arbeitest.** Eine kleine schwebende Anzeige für Windows, die die Zahlen der eigenen [GoatCounter](https://www.goatcounter.com)-Seite live zeigt: Seitenbesuche oder Kachel-Klicks im gewählten Zeitraum, Balken je Werkzeug, dazu Länder oder Verweise. Schwarz, pinke Schrift, blaue Balken.
 
 ![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-818cf8) ![Voraussetzung](https://img.shields.io/badge/Voraussetzung-eigenes%20GoatCounter--Konto-4338ca) ![Sprachen](https://img.shields.io/badge/Sprachen-14-6366f1) ![Lizenz](https://img.shields.io/badge/Lizenz-MIT-a5b4fc)
 
@@ -22,13 +22,21 @@ Eine eigene Webseite, die mit GoatCounter zählt. Der Ticker zählt selbst nicht
 
 | | |
 |---|---|
-| **Aufrufe** | die große Zahl: Seitenaufrufe im gewählten Zeitraum (heute / 7 Tage / 30 Tage / gesamt), daneben der Heute- und der Gesamtwert |
-| **Balken** | Besucher je Seite. Unterseiten werden ihrer Seite zugeschlagen, statt einzeln aufzutauchen |
+| **Große Zahl** | die Summe im gewählten Zeitraum (heute / 7 Tage / 30 Tage / gesamt), daneben der Heute- und der Gesamtwert |
+| **Balken** | ein Balken je Werkzeug. Unterseiten werden ihrer Seite zugeschlagen, Mini-Kacheln ihrer Kachel |
 | **Zusatzblock** | wahlweise Länder oder Verweise, oder aus |
 
-**Die Summe der Balken ergibt nicht die große Zahl, mit Absicht.** GoatCounter kennt zwei verschiedene Größen: *Aufrufe* (wie oft wurde etwas geöffnet) und *Besucher* (wie viele Leute waren da). Der Ticker vermischt sie nicht, die Beschriftung hält sie auseinander.
+**Was gezählt wird** (Tray-Menü → **Zählweise**):
 
-Klick-Ereignisse (GoatCounters `data-count`-Events) werden aus den Balken herausgefiltert. Sonst zählte ein einziger Klick doppelt: einmal als Seitenaufruf, einmal als Ereignis.
+| | |
+|---|---|
+| **Seitenbesuche** | Besucher je Seite. Klick-Ereignisse bleiben draußen, sie sind keine Seiten |
+| **Kachel-Klicks** | nur Ereignisse, deren Name mit `kachel-` beginnt: `kachel-ram` für einen Klick auf eine Kachel, `kachel-ram-anleitung` für eine Mini-Kachel darin. So meldet die [Werkstatt](https://dennismit2n.github.io/) seit dem 12. November 2026 Klicks auf ihre Kacheln, und sonst nichts. Der Balken heißt wie der Titel, den die Seite mitschickt |
+| **automatisch** (Standard) | Kachel-Klicks, sobald die Seite je einen gemeldet hat, sonst Seitenbesuche |
+
+Die große Zahl ist die Summe aller Seiten oder aller Kacheln. Die Balken zeigen nur die größten Werkzeuge; passen alle hinein, ergeben sie zusammen genau diese Zahl.
+
+GoatCounter zählt *Besucher*, keine einzelnen Aufrufe oder Klicks: Öffnet jemand bei einem Besuch dieselbe Seite oder klickt dieselbe Kachel mehrmals, zählt das einmal. So steht es jetzt auch in der Beschriftung (bis Version 1.2.0 hieß die große Zahl „Aufrufe“ und enthielt auch die Klick-Ereignisse).
 
 ## Loslegen
 
@@ -50,7 +58,7 @@ pythonw besucher_ticker.py
 |---|---|
 | Ziehen | Overlay verschieben, die Position wird beim Loslassen gemerkt |
 | Doppelklick | zwischen klein und groß umschalten |
-| Rechtsklick aufs Taskleisten-Symbol | Overlay an/aus, zur Mitte holen, jetzt aktualisieren, Zeitraum, Zusatzblock, Einstellungen, Themes, Zugang ändern, Sprache, Beenden |
+| Rechtsklick aufs Taskleisten-Symbol | Overlay an/aus, zur Mitte holen, jetzt aktualisieren, Zeitraum, Zusatzblock, Zählweise, Einstellungen, Themes, Zugang ändern, Sprache, Beenden |
 
 Verschwunden? **Zur Mitte holen** im Menü. Das passiert, wenn ein zweiter Bildschirm abgezogen wurde: Das Overlay ist randlos und hat keine Titelleiste zum Zurückholen.
 
@@ -62,9 +70,9 @@ Das Token liegt in der `config.json` neben dem Programm, mit `pywin32` per Windo
 
 ## Unter der Haube
 
-Eine Datei, rund 2.700 Zeilen, drei Fremdpakete (`requests`, `pystray`, `pillow`; `pywin32` optional), alles andere ist Python-Standardbibliothek.
+Eine Datei, rund 3.000 Zeilen, drei Fremdpakete (`requests`, `pystray`, `pillow`; `pywin32` optional), alles andere ist Python-Standardbibliothek.
 
-- Ein Durchlauf braucht 3 bis 4 Anfragen, nacheinander. GoatCounter erlaubt 4 je Sekunde. Selbst die schnellste Stufe (15 s) bleibt weit darunter, und Sekundenstufen gibt es bewusst nicht.
+- Ein Durchlauf braucht 2 bis 5 Anfragen, nacheinander und mindestens 0,26 s auseinander. GoatCounter erlaubt 4 je Sekunde. Bei den Kachel-Klicks wird `/stats/hits` in Schritten von 100 Pfaden durchgeblättert (`exclude_paths`), höchstens 10 Seiten. Selbst die schnellste Stufe (15 s) bleibt weit unter der Grenze, und Sekundenstufen gibt es bewusst nicht.
 - Die Gesamtsumme wird höchstens alle 10 Minuten frisch geholt: Sie ändert sich träge, und jede Abfrage kostet eine Anfrage.
 - Bei HTTP 429 wartet der Ticker, so lange der Server es verlangt. GoatCounter meldet das im Kopffeld `X-Rate-Limit-Reset`, ersatzweise `Retry-After`.
 - `python besucher_ticker.py --selbsttest` prüft die Rechen- und Zuordnungslogik ohne Netz und ohne Fenster.

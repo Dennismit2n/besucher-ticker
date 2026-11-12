@@ -1,5 +1,5 @@
 """
-Besucher-Ticker v1.2.0 · GoatCounter-Overlay + System-Tray (Windows)
+Besucher-Ticker v1.3.0 · GoatCounter-Overlay + System-Tray (Windows)
 ==================================================================
 Zeigt die Besucherzahlen der eigenen GoatCounter-Seite live als
 schwebendes, halbtransparentes Overlay. An/Aus über das Tray-Icon.
@@ -33,21 +33,29 @@ Bedienung:
     - Overlay mit Maus verschiebbar (einfach ziehen)
     - Doppelklick aufs Overlay: Mini-/Maxi-Modus umschalten
     - Rechtsklick aufs Tray-Icon: Overlay an/aus, zur Mitte holen,
-      Jetzt aktualisieren, Zeitraum, Zusatzblock, Einstellungen,
-      Nächstes Theme, Zugang ändern, Sprache, Beenden
+      Jetzt aktualisieren, Zeitraum, Zusatzblock, Zählweise,
+      Einstellungen, Nächstes Theme, Zugang ändern, Sprache, Beenden
 
-Zu den Zahlen — was hier was bedeutet:
-    GoatCounter unterscheidet zwei Dinge, und dieser Ticker vermischt
-    sie nicht:
-      * "Aufrufe"  = Seitenaufrufe insgesamt (Feld `total`)
-      * "Besucher" = gezählte Besucher je Pfad (Feld `count` je Pfad)
-    Die grossen Zahlen oben sind Aufrufe, die Balken sind Besucher.
-    Deshalb ist die Summe der Balken NICHT die grosse Zahl.
+Zu den Zahlen, was hier was bedeutet:
+    GoatCounter speichert seit Langem keine einzelnen Aufrufe mehr,
+    sondern Besucher je Pfad (Feld `count` in /stats/hits). Klickt
+    dieselbe Person mehrmals auf dasselbe, zählt das einmal. Die API
+    liefert in /stats/total die Summe über alle Pfade (`total`) und
+    davon den Anteil der Ereignisse (`total_events`).
 
-    Ereignisse (die `data-count`-Klicks aus der Werkstatt) tragen in
-    der API `event: true`. Sie werden aus den Werkzeug-Balken heraus-
-    gefiltert — sonst zählte ein Klick doppelt: einmal als Seiten-
-    aufruf und einmal als Ereignis.
+    Zwei Zählweisen, im Tray unter "Zählweise":
+      * Seitenbesuche: grosse Zahl = total - total_events, die Balken
+        sind die Seiten je Werkzeug. Ereignisse bleiben draussen.
+      * Kachel-Klicks: nur Ereignisse, deren Pfad mit "kachel-"
+        beginnt. So meldet die Werkstatt seit dem 12.11.2026 jeden
+        Klick auf eine Kachel ("kachel-ram") oder eine Mini-Kachel
+        darin ("kachel-ram-anleitung"), und sonst nichts. Grosse Zahl
+        = Summe aller Kachel-Pfade, Balken = je Werkzeug zusammen-
+        gefasst, beschriftet mit dem Titel, den die Seite mitschickt.
+      * automatisch (Standard): Kachel-Klicks, sobald es auf der Seite
+        je einen gab, sonst Seitenbesuche.
+    Die Balken zeigen die grössten Werkzeuge; passen alle hinein,
+    ergeben sie zusammen genau die grosse Zahl.
 
 Datenschutz: Das Token bleibt ausschliesslich lokal (config.json neben
 dem Skript). Es werden nur Lesezugriffe auf die eigene Seite gemacht.
@@ -102,14 +110,17 @@ LOCK_PATH = os.path.join(_BASE_DIR, ".besucher.lock")
 RETRY_BACKOFF = (10, 30, 60)          # Sekunden nach normalen Fehlern
 RATE_LIMIT_BACKOFF = (30, 120, 300)   # nach HTTP 429
 RATE_LIMIT_MAX_WAIT = 3600
-UA = "BesucherTicker/1.2.0 (personal read-only GoatCounter display)"
+UA = "BesucherTicker/1.3.0 (personal read-only GoatCounter display)"
 
 BAR_W, BAR_H = 190, 8
 
 # GoatCounter erlaubt 4 Anfragen pro Sekunde. Ein Durchlauf braucht
-# 3–4 Anfragen, die nacheinander laufen — deshalb ist selbst die
-# schnellste Stufe hier unkritisch. Trotzdem keine Sekundenstufen:
+# 2–5 Anfragen (Kachel-Klicks: eine je 100 Pfade mehr), die nacheinander
+# laufen, mit mindestens API_ABSTAND Sekunden dazwischen. Nacheinander
+# allein reicht nicht: Antwortet der Server in 0,1 s, wären das sonst
+# zehn Anfragen je Sekunde. Trotzdem keine Sekundenstufen:
 # es gibt keinen Grund, fremde Server im Sekundentakt zu fragen.
+API_ABSTAND = 0.26
 # Die Beschriftungen entstehen erst bei der Anzeige (refresh_name,
 # dauer_name), damit sie der gewählten Sprache folgen.
 REFRESH_CHOICES = [15, 30, 60, 120, 300, 900, 3600]
@@ -141,9 +152,26 @@ DEFAULT_ZUSATZ = "verweise"
 # erfasst. GoatCounter selbst kennt kein "seit Anbeginn"-Kürzel.
 ALLTIME_START = "2020-01-01T00:00:00Z"
 ALLTIME_CACHE_SECONDS = 600           # Gesamtsumme ändert sich träge
+FRISCH_SEKUNDEN = 10                  # "frisch" = aus demselben Durchlauf
 
 MAX_BALKEN_CHOICES = [3, 5, 8, 10, 12, 15]
 DEFAULT_MAX_BALKEN = 8
+
+# Was gezählt wird: Schlüssel -> Textschlüssel. Siehe oben "Zu den Zahlen".
+ZAEHLARTEN = [
+    ("auto", "artAuto"),
+    ("seiten", "artSeiten"),
+    ("klicks", "artKlicks"),
+]
+DEFAULT_ZAEHLART = "auto"
+
+# So beginnen die Ereignisse, die die Werkstatt für Klicks auf ihre
+# Kacheln schickt: "kachel-<werkzeug>" und "kachel-<werkzeug>-<teil>".
+KACHEL_PRAEFIX = "kachel-"
+
+# /stats/hits liefert höchstens 100 Pfade je Anfrage. Für die Summe aller
+# Kachel-Klicks wird weitergeblättert, aber nie mehr als so viele Seiten.
+HITS_SEITEN_MAX = 10
 
 # ------------------------------ Themes --------------------------------------
 # Bewusst nur drei. Der Wunsch war eindeutig: schwarz, pinke Schrift,
@@ -202,10 +230,15 @@ TEXTE: dict[str, dict[str, str]] = {
         "_name": "Deutsch",
         "titel": "Besucher",
         "lade": "lade…",
-        "aufrufe": "Aufrufe",
         "heuteN": "{n} heute",
         "gesamtN": "{n} gesamt",
         "jeWerkzeug": "Besucher je Werkzeug",
+        "artAuto": "automatisch",
+        "artSeiten": "Seitenbesuche",
+        "artKlicks": "Kachel-Klicks",
+        "jeKachel": "Klicks je Kachel",
+        "mZaehlart": "Zählweise",
+        "setZaehlart": "Was gezählt wird",
         "startseite": "Startseite",
         "zeitHeute": "Heute",
         "zeit7": "7 Tage",
@@ -259,10 +292,15 @@ TEXTE: dict[str, dict[str, str]] = {
         "_name": "English",
         "titel": "Visitors",
         "lade": "loading…",
-        "aufrufe": "Views",
         "heuteN": "{n} today",
         "gesamtN": "{n} total",
         "jeWerkzeug": "Visitors per tool",
+        "artAuto": "automatic",
+        "artSeiten": "Page visits",
+        "artKlicks": "Tile clicks",
+        "jeKachel": "Clicks per tile",
+        "mZaehlart": "Counting",
+        "setZaehlart": "What is counted",
         "startseite": "Home page",
         "zeitHeute": "Today",
         "zeit7": "7 days",
@@ -316,10 +354,15 @@ TEXTE: dict[str, dict[str, str]] = {
         "_name": "Español",
         "titel": "Visitas",
         "lade": "cargando…",
-        "aufrufe": "Visitas",
         "heuteN": "{n} hoy",
         "gesamtN": "{n} en total",
         "jeWerkzeug": "Visitas por herramienta",
+        "artAuto": "automático",
+        "artSeiten": "Visitas a páginas",
+        "artKlicks": "Clics en tarjetas",
+        "jeKachel": "Clics por tarjeta",
+        "mZaehlart": "Recuento",
+        "setZaehlart": "Qué se cuenta",
         "startseite": "Página de inicio",
         "zeitHeute": "Hoy",
         "zeit7": "7 días",
@@ -373,10 +416,15 @@ TEXTE: dict[str, dict[str, str]] = {
         "_name": "Français",
         "titel": "Visiteurs",
         "lade": "chargement…",
-        "aufrufe": "Vues",
         "heuteN": "{n} aujourd’hui",
         "gesamtN": "{n} au total",
         "jeWerkzeug": "Visiteurs par outil",
+        "artAuto": "automatique",
+        "artSeiten": "Visites de pages",
+        "artKlicks": "Clics sur les vignettes",
+        "jeKachel": "Clics par vignette",
+        "mZaehlart": "Comptage",
+        "setZaehlart": "Ce qui est compté",
         "startseite": "Page d’accueil",
         "zeitHeute": "Aujourd’hui",
         "zeit7": "7 jours",
@@ -430,10 +478,15 @@ TEXTE: dict[str, dict[str, str]] = {
         "_name": "Italiano",
         "titel": "Visitatori",
         "lade": "caricamento…",
-        "aufrufe": "Visualizzazioni",
         "heuteN": "{n} oggi",
         "gesamtN": "{n} in totale",
         "jeWerkzeug": "Visitatori per strumento",
+        "artAuto": "automatico",
+        "artSeiten": "Visite alle pagine",
+        "artKlicks": "Clic sulle schede",
+        "jeKachel": "Clic per scheda",
+        "mZaehlart": "Conteggio",
+        "setZaehlart": "Cosa viene contato",
         "startseite": "Pagina iniziale",
         "zeitHeute": "Oggi",
         "zeit7": "7 giorni",
@@ -487,10 +540,15 @@ TEXTE: dict[str, dict[str, str]] = {
         "_name": "Nederlands",
         "titel": "Bezoekers",
         "lade": "laden…",
-        "aufrufe": "Weergaven",
         "heuteN": "{n} vandaag",
         "gesamtN": "{n} in totaal",
         "jeWerkzeug": "Bezoekers per tool",
+        "artAuto": "automatisch",
+        "artSeiten": "Paginabezoeken",
+        "artKlicks": "Tegelklikken",
+        "jeKachel": "Klikken per tegel",
+        "mZaehlart": "Telling",
+        "setZaehlart": "Wat er geteld wordt",
         "startseite": "Startpagina",
         "zeitHeute": "Vandaag",
         "zeit7": "7 dagen",
@@ -544,10 +602,15 @@ TEXTE: dict[str, dict[str, str]] = {
         "_name": "Polski",
         "titel": "Odwiedziny",
         "lade": "wczytywanie…",
-        "aufrufe": "Wyświetlenia",
         "heuteN": "dziś: {n}",
         "gesamtN": "razem: {n}",
         "jeWerkzeug": "Odwiedziny według narzędzia",
+        "artAuto": "automatycznie",
+        "artSeiten": "Odwiedziny stron",
+        "artKlicks": "Kliknięcia kafelków",
+        "jeKachel": "Kliknięcia według kafelka",
+        "mZaehlart": "Liczenie",
+        "setZaehlart": "Co jest liczone",
         "startseite": "Strona główna",
         "zeitHeute": "Dziś",
         "zeit7": "7 dni",
@@ -601,10 +664,15 @@ TEXTE: dict[str, dict[str, str]] = {
         "_name": "Português",
         "titel": "Visitantes",
         "lade": "carregando…",
-        "aufrufe": "Visualizações",
         "heuteN": "{n} hoje",
         "gesamtN": "{n} no total",
         "jeWerkzeug": "Visitantes por ferramenta",
+        "artAuto": "automático",
+        "artSeiten": "Visitas às páginas",
+        "artKlicks": "Cliques nos cartões",
+        "jeKachel": "Cliques por cartão",
+        "mZaehlart": "Contagem",
+        "setZaehlart": "O que é contado",
         "startseite": "Página inicial",
         "zeitHeute": "Hoje",
         "zeit7": "7 dias",
@@ -658,10 +726,15 @@ TEXTE: dict[str, dict[str, str]] = {
         "_name": "Türkçe",
         "titel": "Ziyaretçiler",
         "lade": "yükleniyor…",
-        "aufrufe": "Görüntüleme",
         "heuteN": "bugün {n}",
         "gesamtN": "toplam {n}",
         "jeWerkzeug": "Araç başına ziyaretçi",
+        "artAuto": "otomatik",
+        "artSeiten": "Sayfa ziyaretleri",
+        "artKlicks": "Kart tıklamaları",
+        "jeKachel": "Kart başına tıklama",
+        "mZaehlart": "Sayım",
+        "setZaehlart": "Neyin sayıldığı",
         "startseite": "Ana sayfa",
         "zeitHeute": "Bugün",
         "zeit7": "7 gün",
@@ -715,10 +788,15 @@ TEXTE: dict[str, dict[str, str]] = {
         "_name": "Русский",
         "titel": "Посетители",
         "lade": "загрузка…",
-        "aufrufe": "Просмотры",
         "heuteN": "сегодня: {n}",
         "gesamtN": "всего: {n}",
         "jeWerkzeug": "Посетители по инструментам",
+        "artAuto": "автоматически",
+        "artSeiten": "Посещения страниц",
+        "artKlicks": "Клики по плиткам",
+        "jeKachel": "Клики по каждой плитке",
+        "mZaehlart": "Подсчёт",
+        "setZaehlart": "Что считается",
         "startseite": "Главная страница",
         "zeitHeute": "Сегодня",
         "zeit7": "7 дней",
@@ -772,10 +850,15 @@ TEXTE: dict[str, dict[str, str]] = {
         "_name": "हिन्दी",
         "titel": "विज़िटर",
         "lade": "लोड हो रहा है…",
-        "aufrufe": "व्यू",
         "heuteN": "आज {n}",
         "gesamtN": "कुल {n}",
         "jeWerkzeug": "हर टूल के विज़िटर",
+        "artAuto": "स्वचालित",
+        "artSeiten": "पेज विज़िट",
+        "artKlicks": "कार्ड क्लिक",
+        "jeKachel": "हर कार्ड के क्लिक",
+        "mZaehlart": "गिनती",
+        "setZaehlart": "क्या गिना जाता है",
         "startseite": "होम पेज",
         "zeitHeute": "आज",
         "zeit7": "7 दिन",
@@ -829,10 +912,15 @@ TEXTE: dict[str, dict[str, str]] = {
         "_name": "中文",
         "titel": "访客",
         "lade": "正在加载…",
-        "aufrufe": "浏览量",
         "heuteN": "今天 {n}",
         "gesamtN": "总计 {n}",
         "jeWerkzeug": "各工具的访客",
+        "artAuto": "自动",
+        "artSeiten": "页面访问",
+        "artKlicks": "卡片点击",
+        "jeKachel": "各卡片的点击",
+        "mZaehlart": "计数方式",
+        "setZaehlart": "统计什么",
         "startseite": "首页",
         "zeitHeute": "今天",
         "zeit7": "7 天",
@@ -886,10 +974,15 @@ TEXTE: dict[str, dict[str, str]] = {
         "_name": "日本語",
         "titel": "訪問者",
         "lade": "読み込み中…",
-        "aufrufe": "表示回数",
         "heuteN": "今日 {n}",
         "gesamtN": "合計 {n}",
         "jeWerkzeug": "ツールごとの訪問者",
+        "artAuto": "自動",
+        "artSeiten": "ページ訪問",
+        "artKlicks": "カードのクリック",
+        "jeKachel": "カードごとのクリック",
+        "mZaehlart": "集計方法",
+        "setZaehlart": "何を数えるか",
         "startseite": "トップページ",
         "zeitHeute": "今日",
         "zeit7": "7 日間",
@@ -943,10 +1036,15 @@ TEXTE: dict[str, dict[str, str]] = {
         "_name": "한국어",
         "titel": "방문자",
         "lade": "불러오는 중…",
-        "aufrufe": "조회수",
         "heuteN": "오늘 {n}",
         "gesamtN": "전체 {n}",
         "jeWerkzeug": "도구별 방문자",
+        "artAuto": "자동",
+        "artSeiten": "페이지 방문",
+        "artKlicks": "타일 클릭",
+        "jeKachel": "타일별 클릭",
+        "mZaehlart": "집계 방식",
+        "setZaehlart": "무엇을 집계할지",
         "startseite": "홈페이지",
         "zeitHeute": "오늘",
         "zeit7": "7일",
@@ -1581,6 +1679,7 @@ class GoatCounterAPI:
     def __init__(self, site: str, token: str):
         self.session = requests.Session()
         self.site = ""
+        self._letzte_anfrage = 0.0
         self.set_zugang(site, token)
 
     def set_zugang(self, site: str, token: str) -> None:
@@ -1594,6 +1693,10 @@ class GoatCounterAPI:
 
     def _get(self, pfad: str, params: dict | None = None):
         url = f"{self.site}/api/v0{pfad}"
+        warten = API_ABSTAND - (time.monotonic() - self._letzte_anfrage)
+        if warten > 0:
+            time.sleep(warten)
+        self._letzte_anfrage = time.monotonic()
         r = self.session.get(url, params=params or {}, timeout=20)
         if r.status_code in (401, 403):
             raise PermissionError("Token ungültig oder ohne Leserecht")
@@ -1620,6 +1723,28 @@ class GoatCounterAPI:
     def hits(self, start: str, end: str, limit: int = 100) -> dict:
         return self._get("/stats/hits",
                          {"start": start, "end": end, "limit": limit})
+
+    def hits_alle(self, start: str, end: str,
+                  max_seiten: int = HITS_SEITEN_MAX) -> list[dict]:
+        """Alle Pfade des Zeitraums, je Anfrage höchstens 100.
+
+        Weitergeblättert wird, wie GoatCounter es vorsieht: Die schon
+        gelieferten Pfade gehen als `exclude_paths` (ihre IDs, mit Komma
+        getrennt) in die nächste Anfrage, bis `more` falsch ist."""
+        alle: list[dict] = []
+        gesehen: list[str] = []
+        for _ in range(max_seiten):
+            params = {"start": start, "end": end, "limit": 100}
+            if gesehen:
+                params["exclude_paths"] = ",".join(gesehen)
+            antwort = self._get("/stats/hits", params) or {}
+            neu = [h for h in antwort.get("hits") or [] if isinstance(h, dict)]
+            alle.extend(neu)
+            ids = [str(h["path_id"]) for h in neu if h.get("path_id") is not None]
+            if not antwort.get("more") or not ids:
+                break
+            gesehen.extend(ids)
+        return alle
 
     def seite(self, page: str, start: str, end: str, limit: int = 10) -> dict:
         return self._get(f"/stats/{page}",
@@ -1676,16 +1801,21 @@ def pfad_label(pfad: str) -> str:
     return erster.lstrip("/") or "Startseite"
 
 
-def auswerten_hits(payload: dict, max_balken: int) -> list[dict]:
-    """Fasst die Pfadliste zu Werkzeug-Balken zusammen.
+def _hitliste(hits) -> list[dict]:
+    """Nimmt die Antwort von /stats/hits oder schon die Liste daraus."""
+    if isinstance(hits, dict):
+        hits = hits.get("hits")
+    return [h for h in hits or [] if isinstance(h, dict)]
 
-    Ereignisse (event: true) fliegen raus — sie sind die data-count-
-    Klicks der Werkstatt und würden sonst neben dem Seitenaufruf ein
-    zweites Mal zählen."""
+
+def auswerten_hits(hits, max_balken: int) -> list[dict]:
+    """Zählweise Seitenbesuche: Pfadliste zu Werkzeug-Balken zusammenfassen.
+
+    Ereignisse (event: true) fliegen raus, sie sind Klicks und keine
+    Seiten. Zählt eine Seite beides, kämen sonst Klicks auf die Seiten-
+    besuche drauf."""
     summen: dict[str, int] = {}
-    for hit in (payload or {}).get("hits") or []:
-        if not isinstance(hit, dict):
-            continue
+    for hit in _hitliste(hits):
         if hit.get("event"):
             continue
         label = pfad_label(hit.get("path", "/"))
@@ -1693,6 +1823,59 @@ def auswerten_hits(payload: dict, max_balken: int) -> list[dict]:
     reihen = [{"label": k, "count": v} for k, v in summen.items() if v > 0]
     reihen.sort(key=lambda r: (-r["count"], r["label"]))
     return reihen[:max_balken]
+
+
+def besucher_seiten(total_payload: dict) -> int:
+    """Zählweise Seitenbesuche: `total` zählt die Ereignisse mit, die
+    gehören aber nicht dazu. Ältere GoatCounter-Fassungen ohne
+    `total_events` liefern dort nichts, dann bleibt `total`."""
+    t = total_payload or {}
+    return max(0, _zahl(t.get("total")) - _zahl(t.get("total_events")))
+
+
+def kachel_schluessel(pfad: str) -> str | None:
+    """'kachel-ram' und 'kachel-ram-anleitung' -> 'ram', sonst None."""
+    p = (pfad or "").strip().lstrip("/")
+    if not p.startswith(KACHEL_PRAEFIX):
+        return None
+    return p[len(KACHEL_PRAEFIX):].split("-", 1)[0] or None
+
+
+def ist_kachel_klick(hit: dict) -> bool:
+    return bool(hit.get("event")) and kachel_schluessel(hit.get("path", "")) is not None
+
+
+def hat_kachel_klicks(hits) -> bool:
+    return any(ist_kachel_klick(h) and _zahl(h.get("count")) > 0
+               for h in _hitliste(hits))
+
+
+def auswerten_klicks(hits, max_balken: int) -> tuple[list[dict], int]:
+    """Zählweise Kachel-Klicks: (Balken je Werkzeug, Summe aller Kacheln).
+
+    Große Kachel und Mini-Kacheln eines Werkzeugs landen im selben
+    Balken. Die Beschriftung ist der Titel, den die Seite mitschickt
+    (der Werkzeugname auf der Kachel), ersatzweise der Schlüssel. Die
+    Summe zählt alle Kacheln, auch die, die nicht mehr als Balken
+    hineinpassen."""
+    summen: dict[str, int] = {}
+    namen: dict[str, str] = {}
+    for hit in _hitliste(hits):
+        if not ist_kachel_klick(hit):
+            continue
+        pfad = (hit.get("path") or "").strip().lstrip("/")
+        key = kachel_schluessel(pfad)
+        summen[key] = summen.get(key, 0) + _zahl(hit.get("count"))
+        titel = (hit.get("title") or "").strip()
+        # Die große Kachel hat Vorrang; ein Titel, der nur der Pfad ist,
+        # taugt nicht als Name.
+        if titel and titel != pfad and (key not in namen
+                                        or pfad == KACHEL_PRAEFIX + key):
+            namen[key] = titel
+    reihen = [{"label": namen.get(k, k), "count": v}
+              for k, v in summen.items() if v > 0]
+    reihen.sort(key=lambda r: (-r["count"], r["label"]))
+    return reihen[:max_balken], sum(summen.values())
 
 
 def auswerten_stats(payload: dict, max_zeilen: int = 4,
@@ -1757,6 +1940,9 @@ class TickerApp:
         if self.zusatz not in [k for k, _, _ in ZUSATZ_CHOICES]:
             self.zusatz = DEFAULT_ZUSATZ
         self.max_balken = int(self.cfg.get("max_balken", DEFAULT_MAX_BALKEN))
+        self.zaehlart = self.cfg.get("zaehlart", DEFAULT_ZAEHLART)
+        if self.zaehlart not in [k for k, _ in ZAEHLARTEN]:
+            self.zaehlart = DEFAULT_ZAEHLART
 
         self.api = GoatCounterAPI(self.cfg["site"], self.cfg["api_token"])
         self.ui_queue: queue.Queue = queue.Queue()
@@ -1769,6 +1955,10 @@ class TickerApp:
         # deshalb gecacht statt bei jedem Durchlauf neu geholt.
         self._alltime_wert: int | None = None
         self._alltime_zeit = 0.0
+        # Dasselbe für die Pfadliste seit Anbeginn: Sie liefert bei den
+        # Kachel-Klicks die Gesamtsumme und entscheidet "automatisch".
+        self._alltime_hits: list[dict] | None = None
+        self._alltime_hits_zeit = 0.0
 
         self.compact = bool(self.cfg.get("compact", False))
         self.visible = True
@@ -1798,6 +1988,9 @@ class TickerApp:
 
     def zusatz_name(self) -> str:
         return tx(next((n for k, n, _ in ZUSATZ_CHOICES if k == self.zusatz), "zusAus"))
+
+    def zaehlart_name(self) -> str:
+        return tx(next((n for k, n in ZAEHLARTEN if k == self.zaehlart), "artAuto"))
 
     # ---------- UI ----------
 
@@ -1980,12 +2173,16 @@ class TickerApp:
         heute = self.daten.get("heute", 0)
         gesamt = self.daten.get("gesamt")
         zeitraum_total = self.daten.get("zeitraum_total", 0)
+        # Beschriftet wird, was tatsächlich gezählt wurde, auch bei
+        # "automatisch".
+        klicks = self.daten.get("art") == "klicks"
+        gross = tx("artKlicks" if klicks else "artSeiten")
 
         if self.compact:
             tk.Label(self.body, text=zahl_kurz(zeitraum_total),
                      fg=t["big"], bg=t["bg"],
                      font=("Segoe UI", 16, "bold")).pack(anchor="w")
-            tk.Label(self.body, text=f"{tx('aufrufe')} · {self.zeitraum_name()}",
+            tk.Label(self.body, text=f"{gross} · {self.zeitraum_name()}",
                      fg=t["muted"], bg=t["bg"],
                      font=("Segoe UI", 8)).pack(anchor="w")
             self._bind_drag_recursive(self.root)
@@ -2001,7 +2198,7 @@ class TickerApp:
                  font=("Segoe UI", 18, "bold")).pack(side="left")
         rechts = tk.Frame(kopf, bg=t["bg"])
         rechts.pack(side="right", anchor="s")
-        tk.Label(rechts, text=f"{tx('aufrufe')} · {self.zeitraum_name()}",
+        tk.Label(rechts, text=f"{gross} · {self.zeitraum_name()}",
                  fg=t["muted"], bg=t["bg"],
                  font=("Segoe UI", 8)).pack(anchor="e")
         if self.zeitraum != "heute":
@@ -2016,7 +2213,7 @@ class TickerApp:
         # --- Balken je Werkzeug ---
         balken = self.daten.get("balken") or []
         if balken:
-            tk.Label(self.body, text=tx("jeWerkzeug"),
+            tk.Label(self.body, text=tx("jeKachel" if klicks else "jeWerkzeug"),
                      fg=t["muted"], bg=t["bg"],
                      font=("Segoe UI", 8)).pack(anchor="w", pady=(6, 0))
             hoechst = max(b["count"] for b in balken) or 1
@@ -2089,6 +2286,14 @@ class TickerApp:
                 radio=True)
             for key, name, _ in ZUSATZ_CHOICES
         ])
+        zaehlart_menu = pystray.Menu(*[
+            pystray.MenuItem(
+                tx(name),
+                (lambda k: (lambda *_: self.ui_queue.put(("zaehlart", k))))(key),
+                checked=(lambda k: (lambda _i: self.zaehlart == k))(key),
+                radio=True)
+            for key, name in ZAEHLARTEN
+        ])
         sprachen_menu = pystray.Menu(*[
             pystray.MenuItem(
                 TEXTE[code]["_name"],
@@ -2104,6 +2309,7 @@ class TickerApp:
             pystray.Menu.SEPARATOR,
             pystray.MenuItem(tx("mZeitraum"), zeitraum_menu),
             pystray.MenuItem(tx("mZusatz"), zusatz_menu),
+            pystray.MenuItem(tx("mZaehlart"), zaehlart_menu),
             pystray.Menu.SEPARATOR,
             pystray.MenuItem(tx("mEinstellungen"), self._tray_settings),
             pystray.MenuItem(tx("mTheme"), self._tray_next_theme),
@@ -2191,6 +2397,7 @@ class TickerApp:
         schrift = tkfont.nametofont("TkTextFont")
         alle = ([refresh_name(s) for s in REFRESH_CHOICES]
                 + [tx(n) for _, n, _ in ZEITRAEUME + ZUSATZ_CHOICES]
+                + [tx(n) for _, n in ZAEHLARTEN]
                 + [dauer_name(s) for s in COMPACT_DURATIONS]
                 + [theme_anzeige(n) for n in THEME_NAMES])
         breite = max(30, -(-max(schrift.measure(w) for w in alle)
@@ -2256,13 +2463,29 @@ class TickerApp:
                     break
         cb_zus.bind("<<ComboboxSelected>>", on_zus)
 
+        # --- Zählweise ---
+        lbl(tx("setZaehlart"), 7)
+        self._art_var = tk.StringVar(value=self.zaehlart_name())
+        cb_art = ttk.Combobox(win, textvariable=self._art_var,
+                              values=[tx(n) for _, n in ZAEHLARTEN],
+                              state="readonly", width=breite)
+        cb_art.grid(row=8, column=0, columnspan=2, sticky="we")
+
+        def on_art(_e=None):
+            sel = self._art_var.get()
+            for key, name in ZAEHLARTEN:
+                if tx(name) == sel:
+                    self._set_zaehlart(key)
+                    break
+        cb_art.bind("<<ComboboxSelected>>", on_art)
+
         # --- Anzahl Balken ---
-        lbl(tx("setBalken"), 7)
+        lbl(tx("setBalken"), 9)
         self._bal_var = tk.StringVar(value=str(self.max_balken))
         cb_bal = ttk.Combobox(win, textvariable=self._bal_var,
                               values=[str(n) for n in MAX_BALKEN_CHOICES],
                               state="readonly", width=breite)
-        cb_bal.grid(row=8, column=0, columnspan=2, sticky="we")
+        cb_bal.grid(row=10, column=0, columnspan=2, sticky="we")
 
         def on_bal(_e=None):
             try:
@@ -2275,7 +2498,7 @@ class TickerApp:
         cb_bal.bind("<<ComboboxSelected>>", on_bal)
 
         # --- Transparenz ---
-        lbl(tx("setAlpha", min=ALPHA_MIN, max=ALPHA_MAX), 9)
+        lbl(tx("setAlpha", min=ALPHA_MIN, max=ALPHA_MAX), 11)
         self._alpha_var = tk.IntVar(value=self.alpha_pct)
 
         def on_alpha(_v=None):
@@ -2289,12 +2512,12 @@ class TickerApp:
                  variable=self._alpha_var, command=on_alpha, bg=t["bg"],
                  fg=t["text"], troughcolor=t["bar_bg"], highlightthickness=0,
                  activebackground=t["bar"],
-                 length=230).grid(row=10, column=0, columnspan=2, sticky="we")
+                 length=230).grid(row=12, column=0, columnspan=2, sticky="we")
 
         # --- Mini-/Maxi-Modus ---
-        lbl(tx("setMiniMaxi"), 11)
+        lbl(tx("setMiniMaxi"), 13)
         btn_frame = tk.Frame(win, bg=t["bg"])
-        btn_frame.grid(row=12, column=0, columnspan=2, sticky="w")
+        btn_frame.grid(row=14, column=0, columnspan=2, sticky="w")
         tk.Button(btn_frame, text=tx("mini"), width=8,
                   command=lambda: self._set_compact(True, from_user=True),
                   **knopf_farben(t)).pack(side="left", padx=(0, 6))
@@ -2304,14 +2527,14 @@ class TickerApp:
 
         tk.Label(win, text=tx("setZurueck"), fg=t["text"],
                  bg=t["bg"], font=("Segoe UI", 8)).grid(
-            row=13, column=0, columnspan=2, sticky="w", pady=(6, 2))
+            row=15, column=0, columnspan=2, sticky="w", pady=(6, 2))
         self._dur_var = tk.StringVar(
             value=dauer_name(self.compact_duration
                              if self.compact_duration in COMPACT_DURATIONS else None))
         cb_dur = ttk.Combobox(win, textvariable=self._dur_var,
                               values=[dauer_name(s) for s in COMPACT_DURATIONS],
                               state="readonly", width=breite)
-        cb_dur.grid(row=14, column=0, columnspan=2, sticky="we")
+        cb_dur.grid(row=16, column=0, columnspan=2, sticky="we")
 
         def on_dur(_e=None):
             sel = self._dur_var.get()
@@ -2324,12 +2547,12 @@ class TickerApp:
         cb_dur.bind("<<ComboboxSelected>>", on_dur)
 
         # --- Theme ---
-        lbl(tx("setFarben", n=len(THEME_NAMES)), 15)
+        lbl(tx("setFarben", n=len(THEME_NAMES)), 17)
         self._theme_var = tk.StringVar(value=theme_anzeige(self.theme_name))
         cb_theme = ttk.Combobox(win, textvariable=self._theme_var,
                                 values=[theme_anzeige(n) for n in THEME_NAMES],
                                 state="readonly", width=breite)
-        cb_theme.grid(row=16, column=0, columnspan=2, sticky="we")
+        cb_theme.grid(row=18, column=0, columnspan=2, sticky="we")
 
         def set_theme(name: str):
             if name in THEMES:
@@ -2350,11 +2573,11 @@ class TickerApp:
                            if theme_anzeige(n) == self._theme_var.get()), "")))
 
         tk.Button(win, text=tx("schliessen"), command=win.destroy, width=12,
-                  **knopf_farben(t)).grid(row=17, column=0, columnspan=2, pady=(12, 0))
+                  **knopf_farben(t)).grid(row=19, column=0, columnspan=2, pady=(12, 0))
 
         tk.Label(win, text="© 2026 Dennis_mit_2n", fg=t["muted"], bg=t["bg"],
                  font=("Segoe UI", 8)).grid(
-            row=18, column=0, columnspan=2, pady=(6, 0))
+            row=20, column=0, columnspan=2, pady=(6, 0))
 
         def on_close():
             self.settings_win = None
@@ -2373,6 +2596,15 @@ class TickerApp:
         self.cfg["zusatz"] = key
         save_config(self.cfg)
         self._render()
+        threading.Thread(target=self._refresh_once, daemon=True).start()
+
+    def _set_zaehlart(self, key: str):
+        if key not in [k for k, _ in ZAEHLARTEN]:
+            return
+        self.zaehlart = key
+        self.cfg["zaehlart"] = key
+        save_config(self.cfg)
+        self._alltime_wert = None           # Gesamtsumme gehört zur Zählweise
         threading.Thread(target=self._refresh_once, daemon=True).start()
 
     def _next_theme(self):
@@ -2434,20 +2666,35 @@ class TickerApp:
             return True, None
         try:
             jetzt = datetime.now().astimezone()
+            zeitraum = self.zeitraum           # einmal lesen: die Oberfläche
+            max_balken = self.max_balken       # darf sie währenddessen ändern
             heute_start, heute_ende = zeitfenster("heute", jetzt)
-            zr_start, zr_ende = zeitfenster(self.zeitraum, jetzt)
+            zr_start, zr_ende = zeitfenster(zeitraum, jetzt)
+            art = self._zaehlart_wirksam(heute_ende)
 
-            heute_total = _zahl(self.api.total(heute_start, heute_ende)
-                                .get("total"))
-
-            if self.zeitraum == "heute":
-                zeitraum_total = heute_total
+            if art == "klicks":
+                balken, heute_total = auswerten_klicks(
+                    self.api.hits_alle(heute_start, heute_ende), max_balken)
+                if zeitraum == "heute":
+                    zeitraum_total = heute_total
+                elif zeitraum == "gesamt":
+                    balken, zeitraum_total = auswerten_klicks(
+                        self._alltime_hits_holen(heute_ende, frisch=True),
+                        max_balken)
+                else:
+                    balken, zeitraum_total = auswerten_klicks(
+                        self.api.hits_alle(zr_start, zr_ende), max_balken)
+                gesamt = auswerten_klicks(
+                    self._alltime_hits_holen(heute_ende), 1)[1]
             else:
-                zeitraum_total = _zahl(self.api.total(zr_start, zr_ende)
-                                       .get("total"))
-
-            balken = auswerten_hits(self.api.hits(zr_start, zr_ende, limit=100),
-                                    self.max_balken)
+                heute_total = besucher_seiten(self.api.total(heute_start, heute_ende))
+                if zeitraum == "heute":
+                    zeitraum_total = heute_total
+                else:
+                    zeitraum_total = besucher_seiten(self.api.total(zr_start, zr_ende))
+                balken = auswerten_hits(self.api.hits(zr_start, zr_ende, limit=100),
+                                        max_balken)
+                gesamt = self._gesamt_holen(heute_ende)
 
             zusatz = []
             page = self.zusatz_page()
@@ -2462,9 +2709,8 @@ class TickerApp:
                     # Kein Grund, den ganzen Durchlauf scheitern zu lassen.
                     zusatz = []
 
-            gesamt = self._gesamt_holen(heute_ende)
-
             self.ui_queue.put(("data", {
+                "art": art,
                 "heute": heute_total,
                 "zeitraum_total": zeitraum_total,
                 "balken": balken,
@@ -2485,17 +2731,45 @@ class TickerApp:
             self._refresh_lock.release()
 
     def _gesamt_holen(self, ende: str) -> int | None:
-        """Gesamtsumme, höchstens alle 10 Minuten frisch geholt."""
+        """Gesamtsumme der Seitenbesuche, höchstens alle 10 Minuten frisch."""
         if (self._alltime_wert is not None
                 and time.monotonic() - self._alltime_zeit < ALLTIME_CACHE_SECONDS):
             return self._alltime_wert
         try:
-            wert = _zahl(self.api.total(ALLTIME_START, ende).get("total"))
+            wert = besucher_seiten(self.api.total(ALLTIME_START, ende))
         except (requests.RequestException, ValueError, LookupError):
             return self._alltime_wert          # alter Wert ist besser als keiner
         self._alltime_wert = wert
         self._alltime_zeit = time.monotonic()
         return wert
+
+    def _alltime_hits_holen(self, ende: str, frisch: bool = False) -> list[dict]:
+        """Alle Pfade seit Anbeginn, höchstens alle 10 Minuten frisch geholt.
+        frisch=True (Zeitraum "Gesamt") nimmt nur eine Liste aus demselben
+        Durchlauf, sonst wird neu geholt. Scheitert der Abruf, gilt die alte
+        Liste; gibt es noch keine, scheitert der Durchlauf und wird wiederholt."""
+        alter = time.monotonic() - self._alltime_hits_zeit
+        if (self._alltime_hits is not None
+                and alter < (FRISCH_SEKUNDEN if frisch else ALLTIME_CACHE_SECONDS)):
+            return self._alltime_hits
+        try:
+            hits = self.api.hits_alle(ALLTIME_START, ende)
+        except (requests.RequestException, ValueError, LookupError):
+            if self._alltime_hits is None:
+                raise
+            return self._alltime_hits
+        self._alltime_hits = hits
+        self._alltime_hits_zeit = time.monotonic()
+        return hits
+
+    def _zaehlart_wirksam(self, ende: str) -> str:
+        """'seiten' oder 'klicks'. Bei "automatisch": Kachel-Klicks, sobald
+        die Seite je einen gemeldet hat. Das kippt nicht hin und her, die
+        Liste seit Anbeginn wird nur länger."""
+        art = self.zaehlart
+        if art in ("seiten", "klicks"):
+            return art
+        return "klicks" if hat_kachel_klicks(self._alltime_hits_holen(ende)) else "seiten"
 
     # ---------- Queue / Mainloop ----------
 
@@ -2534,6 +2808,8 @@ class TickerApp:
                     self._set_zeitraum(payload)
                 elif kind == "zusatz":
                     self._set_zusatz(payload)
+                elif kind == "zaehlart":
+                    self._set_zaehlart(payload)
                 elif kind == "toggle":
                     self._toggle_visible()
                 elif kind == "center":
@@ -2559,6 +2835,7 @@ class TickerApp:
         save_config(self.cfg)
         self.api.set_zugang(site, token)
         self._alltime_wert = None
+        self._alltime_hits = None           # andere Seite, andere Pfade
         threading.Thread(target=self._refresh_once, daemon=True).start()
 
     def _toggle_visible(self):
@@ -2609,8 +2886,8 @@ def selbsttest() -> int:
     pruefe("pfad unterseite", pfad_label("/zaehlwerk/hilfe.html"), "Zählwerk")
     pruefe("pfad unbekannt", pfad_label("/neues-tool/"), "neues-tool")
 
-    # Ereignisse dürfen NICHT als Werkzeug-Balken erscheinen, sonst
-    # zählte jeder Werkstatt-Klick doppelt.
+    # Zählweise Seitenbesuche: Ereignisse dürfen NICHT als Werkzeug-Balken
+    # erscheinen, sie sind Klicks und keine Seiten.
     payload = {"hits": [
         {"path": "/wifi-qr/", "count": 10, "event": False},
         {"path": "/wifi-qr/hilfe", "count": 5, "event": False},
@@ -2628,6 +2905,71 @@ def selbsttest() -> int:
                       for i in range(1, 20)]}
     b2 = auswerten_hits(viele, 3)
     pruefe("balken grenze", [b["count"] for b in b2], [19, 18, 17])
+    pruefe("balken liste", auswerten_hits(payload["hits"], 8), balken)
+
+    # Seitenbesuche: total zählt die Ereignisse mit, die gehören nicht dazu.
+    pruefe("seiten ohne events", besucher_seiten({"total": 50, "total_events": 12}), 38)
+    pruefe("seiten alt", besucher_seiten({"total": 50}), 50)
+    pruefe("seiten leer", besucher_seiten({}), 0)
+
+    # Kachel-Klicks: Schlüssel aus dem Ereignispfad
+    pruefe("kachel gross", kachel_schluessel("kachel-ram"), "ram")
+    pruefe("kachel mini", kachel_schluessel("kachel-ram-anleitung"), "ram")
+    pruefe("kachel slash", kachel_schluessel("/kachel-wifi-readme"), "wifi")
+    pruefe("kachel fremd", kachel_schluessel("werkstatt-ram-news"), None)
+    pruefe("kachel leer", kachel_schluessel("kachel-"), None)
+    pruefe("kachel seite", kachel_schluessel("/kachel/"), None)
+
+    klicks = {"hits": [
+        {"path": "/", "count": 40, "event": False, "title": "Werkstatt"},
+        {"path": "kachel-ram", "count": 9, "event": True, "title": "Real_RAM_cooler"},
+        {"path": "kachel-ram-anleitung", "count": 3, "event": True, "title": "Real_RAM_cooler"},
+        {"path": "kachel-ram-news", "count": 1, "event": True, "title": "kachel-ram-news"},
+        {"path": "kachel-wifi-readme", "count": 4, "event": True, "title": "WiFi QR Card"},
+        {"path": "kachel-bigday", "count": 2, "event": True, "title": ""},
+        {"path": "kachel-leer", "count": 0, "event": True, "title": "Leer"},
+        {"path": "werkstatt-ram-news", "count": 77, "event": True, "title": "x"},
+        {"path": "kachel-seite", "count": 5, "event": False, "title": "keine Kachel"},
+    ]}
+    kb, ksum = auswerten_klicks(klicks, 8)
+    pruefe("klicks balken", [(b["label"], b["count"]) for b in kb],
+           [("Real_RAM_cooler", 13), ("WiFi QR Card", 4), ("bigday", 2)])
+    pruefe("klicks summe", ksum, 19)
+    kb1, ksum1 = auswerten_klicks(klicks["hits"], 1)
+    pruefe("klicks grenze", (len(kb1), ksum1), (1, 19))
+    pruefe("klicks keine", auswerten_klicks({"hits": []}, 8), ([], 0))
+    # Titel der großen Kachel schlägt den einer Mini-Kachel, egal in
+    # welcher Reihenfolge sie kommen.
+    vorrang = [{"path": "kachel-ram-news", "count": 5, "event": True, "title": "Alt"},
+               {"path": "kachel-ram", "count": 1, "event": True, "title": "Real_RAM_cooler"}]
+    pruefe("klicks titel", auswerten_klicks(vorrang, 8)[0][0]["label"], "Real_RAM_cooler")
+    pruefe("hat klicks", hat_kachel_klicks(klicks), True)
+    pruefe("hat keine", hat_kachel_klicks({"hits": [
+        {"path": "kachel-ram", "count": 0, "event": True},
+        {"path": "werkstatt-ram-news", "count": 3, "event": True},
+        {"path": "kachel-x", "count": 3, "event": False}]}), False)
+
+    # Blättern: exclude_paths sammelt die IDs, Schluss bei more = false.
+    class _FakeAPI(GoatCounterAPI):
+        def __init__(self):
+            self.anfragen = []
+
+        def _get(self, pfad, params=None):
+            self.anfragen.append(dict(params or {}))
+            seite = len(self.anfragen)
+            if seite == 1:
+                return {"hits": [{"path_id": 1}, {"path_id": 2}], "more": True}
+            if seite == 2:
+                return {"hits": [{"path_id": 3}], "more": True}
+            return {"hits": [{"path_id": 4}], "more": False}
+
+    fake = _FakeAPI()
+    alle = fake.hits_alle("a", "b")
+    pruefe("blaettern anzahl", [h["path_id"] for h in alle], [1, 2, 3, 4])
+    pruefe("blaettern exclude", [a.get("exclude_paths") for a in fake.anfragen],
+           [None, "1,2", "1,2,3"])
+    fake2 = _FakeAPI()
+    pruefe("blaettern grenze", len(fake2.hits_alle("a", "b", max_seiten=2)), 3)
 
     # Zusatzliste
     stats = {"stats": [{"name": "Germany", "count": 4},

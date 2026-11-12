@@ -1,4 +1,4 @@
-Besucher-Ticker v1.2.0
+Besucher-Ticker v1.3.0
 ====================
 Overlay fuer die eigenen GoatCounter-Zahlen. Schwarz, pinke Schrift,
 blaue Balken.
@@ -41,6 +41,7 @@ Rechtsklick aufs Tray-Symbol:
    Overlay an/aus, Overlay zur Mitte holen, Jetzt aktualisieren,
    Zeitraum (heute / 7 Tage / 30 Tage / gesamt),
    Zusatzblock (aus / Laender / Verweise),
+   Zaehlweise (automatisch / Seitenbesuche / Kachel-Klicks),
    Einstellungen, Naechstes Theme, Zugang aendern, Sprache, Beenden
 
 Sprache: Der Ticker spricht 14 Sprachen. Ohne eigene Wahl nimmt er
@@ -50,22 +51,29 @@ die Anzeigesprache von Windows, sonst Englisch.
 WAS DIE ZAHLEN BEDEUTEN
 -----------------------
 
-GoatCounter kennt zwei verschiedene Groessen, und der Ticker mischt
-sie bewusst nicht:
+GoatCounter zaehlt BESUCHER, keine einzelnen Aufrufe oder Klicks:
+Oeffnet jemand bei einem Besuch dieselbe Seite oder klickt dieselbe
+Kachel mehrmals, zaehlt das einmal.
 
-   Die grosse Zahl oben = AUFRUFE im gewaehlten Zeitraum
-   Die Balken           = BESUCHER je Seite
+Was der Ticker zaehlt, steht im Tray-Menue unter "Zaehlweise":
+
+   Seitenbesuche   Besucher je Seite. Klick-Ereignisse bleiben
+                   draussen, sie sind keine Seiten.
+   Kachel-Klicks   nur Ereignisse, deren Name mit "kachel-" beginnt,
+                   z. B. "kachel-ram" (Klick auf die Kachel) und
+                   "kachel-ram-anleitung" (Mini-Kachel darin). So meldet
+                   die Werkstatt seit dem 12.11.2026 Klicks auf ihre
+                   Kacheln, und sonst nichts.
+   automatisch     (Standard) Kachel-Klicks, sobald die Seite je einen
+                   gemeldet hat, sonst Seitenbesuche.
+
+   Die grosse Zahl oben = Summe aller Seiten bzw. aller Kacheln
+                          im gewaehlten Zeitraum
+   Die Balken           = je Werkzeug zusammengefasst
 
 Rechts daneben stehen zusaetzlich der heutige Wert und die Gesamtsumme.
-
-Deshalb ergibt die Summe der Balken NICHT die grosse Zahl. Das ist
-kein Rechenfehler, sondern der Unterschied zwischen "wie oft wurde
-etwas geoeffnet" und "wie viele Leute waren da".
-
-Klick-Ereignisse (data-count-Events von GoatCounter) tragen in der
-API ein eigenes Kennzeichen und werden aus den Balken herausgefiltert.
-Ohne das wuerde ein einziger Klick zweimal zaehlen: einmal als
-Seitenaufruf, einmal als Ereignis.
+Die Balken zeigen nur die groessten Werkzeuge; passen alle hinein,
+ergeben sie zusammen genau die grosse Zahl.
 
 "Gesamt" wird hoechstens alle 10 Minuten neu geholt — die Zahl aendert
 sich ohnehin traege, und jede Abfrage kostet eine Anfrage.
