@@ -1,5 +1,5 @@
 """
-Besucher-Ticker v1.1.6 · GoatCounter-Overlay + System-Tray (Windows)
+Besucher-Ticker v1.2.0 · GoatCounter-Overlay + System-Tray (Windows)
 ==================================================================
 Zeigt die Besucherzahlen der eigenen GoatCounter-Seite live als
 schwebendes, halbtransparentes Overlay. An/Aus über das Tray-Icon.
@@ -56,7 +56,9 @@ dem Skript). Es werden nur Lesezugriffe auf die eigene Seite gemacht.
 from __future__ import annotations
 
 import base64
+import ctypes
 import json
+import math
 import os
 import queue
 import sys
@@ -75,7 +77,7 @@ except ImportError:
 try:
     import requests
     import pystray
-    from PIL import Image, ImageDraw
+    from PIL import Image, ImageChops, ImageDraw, ImageFilter
 except ImportError:
     print("Bitte zuerst installieren:  pip install requests pystray pillow")
     sys.exit(1)
@@ -100,7 +102,7 @@ LOCK_PATH = os.path.join(_BASE_DIR, ".besucher.lock")
 RETRY_BACKOFF = (10, 30, 60)          # Sekunden nach normalen Fehlern
 RATE_LIMIT_BACKOFF = (30, 120, 300)   # nach HTTP 429
 RATE_LIMIT_MAX_WAIT = 3600
-UA = "BesucherTicker/1.1.6 (personal read-only GoatCounter display)"
+UA = "BesucherTicker/1.2.0 (personal read-only GoatCounter display)"
 
 BAR_W, BAR_H = 190, 8
 
@@ -1320,6 +1322,250 @@ def ask_token(parent: tk.Tk | None = None, farben: dict | None = None) -> str | 
     return token or None
 
 
+# ------------------------------ Beschlag ------------------------------------
+# Der Look der Werkstatt: eine Platte mit runder Außenkante, darin ein eckiger
+# Rahmen, an jeder Ecke eine kleine Schraube in Weißgold, jede anders gedreht.
+# Das Licht kommt von rechts oben, darum fällt der Schatten nach links unten.
+#
+# tkinter kann weder weiche Schatten noch geglättete Rundungen. Deshalb liegt
+# hinter der Anzeige ein zweites Fenster, das nur ein Bild zeigt (Platte,
+# Rahmen, Schrauben, Schatten) und dort ein Loch hat, wo die Anzeige sitzt.
+
+B_RADIUS = 14                          # Rundung der Platte
+B_INNEN = 5                            # Abstand des Rahmens von der Kante
+B_ABSTAND = 3                          # Abstand der Schraube vom Rahmen
+B_SCHRAUBE = 10                        # Größe einer Schraube
+B_RAND = B_INNEN + B_ABSTAND + B_SCHRAUBE   # so breit ist die Platte um die Anzeige
+B_SCHATTEN = (-7, 8)                   # Versatz: nach links unten
+B_WEICH = 9                            # Unschärfe des Schattens
+B_LUFT = 26                            # Platz für den Schatten um die Platte
+B_WINKEL = (32, -58, 78, -14)          # Schlitz je Schraube, in Grad
+
+
+def _hex(farbe: str) -> tuple[int, int, int]:
+    return int(farbe[1:3], 16), int(farbe[3:5], 16), int(farbe[5:7], 16)
+
+
+def _mische(a: str, b: str, anteil: float) -> tuple[int, int, int]:
+    """Farbe a mit dem Anteil von b."""
+    x, y = _hex(a), _hex(b)
+    return tuple(round(x[i] + (y[i] - x[i]) * anteil) for i in range(3))
+
+
+def _verlauf(stufen, t: float):
+    """Wert eines Farbverlaufs an der Stelle t. stufen: (stelle, (r, g, b, deckung))"""
+    if t <= stufen[0][0]:
+        return stufen[0][1]
+    for (t0, f0), (t1, f1) in zip(stufen, stufen[1:]):
+        if t <= t1:
+            k = (t - t0) / ((t1 - t0) or 1)
+            return tuple(f0[i] + (f1[i] - f0[i]) * k for i in range(4))
+    return stufen[-1][1]
+
+
+_KOPF = ((0.0, (255, 255, 255, 1)), (0.2, (255, 252, 238, 1)), (0.5, (241, 228, 188, 1)),
+         (0.8, (196, 169, 100, 1)), (1.0, (122, 98, 38, 1)))
+_RING = ((0.0, (138, 106, 34, .55)), (0.5, (255, 243, 196, 0)), (1.0, (255, 251, 234, .7)))
+_SCHRAUBEN: dict = {}
+
+
+def schraube(winkel: float, groesse: int = B_SCHRAUBE):
+    """Eine Schraube in Weißgold, Punkt für Punkt gerechnet: Schatten nach
+    links unten, gewölbter Kopf, Schlitz im Winkel, Glanzpunkt rechts oben.
+    Dieselbe Zeichnung wie auf der Startseite, dort als SVG auf 12 × 12."""
+    if (winkel, groesse) in _SCHRAUBEN:
+        return _SCHRAUBEN[(winkel, groesse)]
+    n = groesse * 6                    # sechsfach gerechnet, dann verkleinert: glatte Kanten
+    co, si = math.cos(math.radians(-winkel)), math.sin(math.radians(-winkel))
+    gc, gs = math.cos(math.radians(35)), math.sin(math.radians(35))
+    punkte = []
+
+    def strich(x, y, x0, x1, y0):
+        """Abstand zu einer waagrechten Strecke mit runden Enden"""
+        return math.hypot(x - max(x0, min(x1, x)), y - y0)
+
+    for j in range(n):
+        v = (j + .5) * 12 / n
+        for i in range(n):
+            u = (i + .5) * 12 / n
+            r = g = b = a = 0.0        # Farbe mal Deckung, wird Schicht für Schicht belegt
+
+            def auf(farbe, deckung):
+                nonlocal r, g, b, a
+                r = farbe[0] * deckung + r * (1 - deckung)
+                g = farbe[1] * deckung + g * (1 - deckung)
+                b = farbe[2] * deckung + b * (1 - deckung)
+                a = deckung + a * (1 - deckung)
+
+            # Schatten der Schraube auf der Platte
+            if math.hypot(u - 5.1, v - 6.9) <= 5:
+                t = math.hypot(u - 4.3, v - 7.7) / 5
+                auf((0, 0, 0), .6 if t <= .55 else max(0.0, .6 * (1 - (t - .55) / .45)))
+            m = math.hypot(u - 6, v - 6)
+            # Kopf, heller Fleck rechts oben
+            if m <= 4.3:
+                f = _verlauf(_KOPF, math.hypot(u - 7.376, v - 4.28) / 6.708)
+                auf(f, 1)
+            # dunkle Kante
+            if abs(m - 4.3) <= .225:
+                auf((85, 62, 12), .6)
+            # feiner Ring: oben rechts dunkel, unten links hell
+            if abs(m - 2.9) <= .25:
+                f = _verlauf(_RING, ((8.9 - u) / 5.8 + (v - 3.1) / 5.8) / 2)
+                auf(f, f[3])
+            # Schlitz und sein heller Rand
+            x = 6 + (u - 6) * co - (v - 6) * si
+            y = 6 + (u - 6) * si + (v - 6) * co
+            if strich(x, y, 2.5, 9.5, 6) <= .6:
+                auf((58, 42, 7), 1)
+            if strich(x, y, 2.7, 9.3, 6.62) <= .15:
+                auf((255, 247, 218), .75)
+            # Glanzpunkt
+            ex = (u - 7.7) * gc - (v - 3.9) * gs
+            ey = (u - 7.7) * gs + (v - 3.9) * gc
+            if (ex / 1.05) ** 2 + (ey / .6) ** 2 <= 1:
+                auf((255, 255, 255), .9)
+            punkte.append((round(r), round(g), round(b), round(a * 255)))
+
+    bild = Image.new("RGBa", (n, n))
+    bild.putdata(punkte)
+    bild = bild.resize((groesse, groesse), Image.LANCZOS).convert("RGBA")
+    _SCHRAUBEN[(winkel, groesse)] = bild
+    return bild
+
+
+def beschlag_bild(w: int, h: int, deckkraft: float, grund: str, linie: str):
+    """Das Bild hinter einer Anzeige von w × h Punkten: Schatten, Platte,
+    Rahmen, Schrauben. Wo die Anzeige sitzt, bleibt es durchsichtig.
+    grund ist die Farbe der Platte, linie färbt Kante und Rahmen (gedämpft)."""
+    pw, ph = w + 2 * B_RAND, h + 2 * B_RAND
+    bw, bh = pw + 2 * B_LUFT, ph + 2 * B_LUFT
+    k = 4                              # Platte vierfach zeichnen, dann verkleinern
+
+    form = Image.new("L", (bw * k, bh * k), 0)
+    kante = [B_LUFT * k, B_LUFT * k, (B_LUFT + pw) * k - 1, (B_LUFT + ph) * k - 1]
+    ImageDraw.Draw(form).rounded_rectangle(kante, radius=B_RADIUS * k, fill=255)
+
+    gross = Image.new("RGB", (bw * k, bh * k), _hex(grund))
+    d = ImageDraw.Draw(gross)
+    d.rounded_rectangle(kante, radius=B_RADIUS * k, width=k,
+                        outline=_mische(grund, linie, .22))
+    i = (B_LUFT + B_INNEN) * k
+    d.rectangle([i, i, (B_LUFT + pw - B_INNEN) * k - 1, (B_LUFT + ph - B_INNEN) * k - 1],
+                width=k, outline=_mische(grund, linie, .40))
+    platte = gross.resize((bw, bh), Image.LANCZOS).convert("RGBA")
+    form = form.resize((bw, bh), Image.LANCZOS)
+    platte.putalpha(form)
+
+    # Schatten: dieselbe Form, versetzt und weich. Unter der Platte selbst
+    # ausgespart, sonst wäre sie dunkler als die Anzeige in ihrer Mitte.
+    schatten = ImageChops.offset(form, B_SCHATTEN[0], B_SCHATTEN[1])
+    schatten = schatten.filter(ImageFilter.GaussianBlur(B_WEICH)).point(lambda v: int(v * .62))
+    schatten = ImageChops.multiply(schatten, ImageChops.invert(form))
+    bild = Image.new("RGBA", (bw, bh), (0, 0, 0, 0))
+    bild.putalpha(schatten)
+    bild.alpha_composite(platte)
+
+    links = B_LUFT + B_INNEN + B_ABSTAND
+    rechts = B_LUFT + pw - B_INNEN - B_ABSTAND - B_SCHRAUBE
+    unten = B_LUFT + ph - B_INNEN - B_ABSTAND - B_SCHRAUBE
+    for (x, y), winkel in zip(((links, links), (rechts, links), (links, unten), (rechts, unten)),
+                              B_WINKEL):
+        bild.alpha_composite(schraube(winkel), (x, y))
+
+    loch = B_LUFT + B_RAND
+    bild.paste((0, 0, 0, 0), (loch, loch, loch + w, loch + h))
+    if deckkraft < 1:
+        bild.putalpha(bild.getchannel("A").point(lambda v: int(v * deckkraft)))
+    return bild
+
+
+# Windows zeigt ein Bild mit weichen Kanten nur über ein „geschichtetes"
+# Fenster. Das Bild wird dem Fenster direkt übergeben, tkinter malt dort nichts.
+
+if os.name == "nt":
+    class _PUNKT(ctypes.Structure):
+        _fields_ = [("x", ctypes.c_long), ("y", ctypes.c_long)]
+
+    class _MASS(ctypes.Structure):
+        _fields_ = [("cx", ctypes.c_long), ("cy", ctypes.c_long)]
+
+    class _MISCHUNG(ctypes.Structure):
+        _fields_ = [("BlendOp", ctypes.c_ubyte), ("BlendFlags", ctypes.c_ubyte),
+                    ("SourceConstantAlpha", ctypes.c_ubyte), ("AlphaFormat", ctypes.c_ubyte)]
+
+    class _BILDKOPF(ctypes.Structure):
+        _fields_ = [("biSize", ctypes.c_uint32), ("biWidth", ctypes.c_long),
+                    ("biHeight", ctypes.c_long), ("biPlanes", ctypes.c_uint16),
+                    ("biBitCount", ctypes.c_uint16), ("biCompression", ctypes.c_uint32),
+                    ("biSizeImage", ctypes.c_uint32), ("biXPelsPerMeter", ctypes.c_long),
+                    ("biYPelsPerMeter", ctypes.c_long), ("biClrUsed", ctypes.c_uint32),
+                    ("biClrImportant", ctypes.c_uint32)]
+
+_WIN = None
+
+
+def _win():
+    """user32 und gdi32 mit sauberen Typen (64-Bit-Zeiger), einmal eingerichtet."""
+    global _WIN
+    if _WIN is None:
+        z, p = ctypes.c_void_p, ctypes.POINTER
+        u, g = ctypes.WinDLL("user32"), ctypes.WinDLL("gdi32")
+        u.GetAncestor.restype, u.GetAncestor.argtypes = z, [z, ctypes.c_uint]
+        u.GetDC.restype, u.GetDC.argtypes = z, [z]
+        u.ReleaseDC.argtypes = [z, z]
+        u.GetWindowLongPtrW.restype, u.GetWindowLongPtrW.argtypes = ctypes.c_ssize_t, [z, ctypes.c_int]
+        u.SetWindowLongPtrW.restype = ctypes.c_ssize_t
+        u.SetWindowLongPtrW.argtypes = [z, ctypes.c_int, ctypes.c_ssize_t]
+        u.UpdateLayeredWindow.argtypes = [z, z, p(_PUNKT), p(_MASS), z, p(_PUNKT),
+                                          ctypes.c_uint32, p(_MISCHUNG), ctypes.c_uint32]
+        g.CreateCompatibleDC.restype, g.CreateCompatibleDC.argtypes = z, [z]
+        g.CreateDIBSection.restype = z
+        g.CreateDIBSection.argtypes = [z, p(_BILDKOPF), ctypes.c_uint, p(z), z, ctypes.c_uint32]
+        g.SelectObject.restype, g.SelectObject.argtypes = z, [z, z]
+        g.DeleteObject.argtypes = [z]
+        g.DeleteDC.argtypes = [z]
+        _WIN = (u, g)
+    return _WIN
+
+
+def schicht_vorbereiten(tk_id: int) -> int:
+    """Macht aus einem tkinter-Fenster ein geschichtetes. Rückgabe: sein Handle."""
+    u, _ = _win()
+    hwnd = u.GetAncestor(tk_id, 2) or tk_id
+    stil = u.GetWindowLongPtrW(hwnd, -20)
+    u.SetWindowLongPtrW(hwnd, -20, stil | 0x00080000 | 0x00000080)   # geschichtet, kein Taskleisten-Knopf
+    return hwnd
+
+
+def schicht_zeigen(hwnd: int, bild, x: int, y: int) -> bool:
+    """Legt das Bild (mit Durchsicht je Punkt) an die Stelle x, y auf den Bildschirm."""
+    u, g = _win()
+    w, h = bild.size
+    # Windows will Farbe mal Deckung (gerundet, sonst sieht man die Naht zur
+    # Anzeige), Reihenfolge Blau-Grün-Rot
+    roh = bild.convert("RGBa").tobytes("raw", "BGRa")
+    kopf = _BILDKOPF(ctypes.sizeof(_BILDKOPF), w, -h, 1, 32, 0, 0, 0, 0, 0, 0)
+    schirm = u.GetDC(None)
+    speicher = g.CreateCompatibleDC(schirm)
+    stelle = ctypes.c_void_p()
+    karte = g.CreateDIBSection(schirm, ctypes.byref(kopf), 0, ctypes.byref(stelle), None, 0)
+    if not karte or not stelle:
+        g.DeleteDC(speicher)
+        u.ReleaseDC(None, schirm)
+        return False
+    ctypes.memmove(stelle, roh, len(roh))
+    alt = g.SelectObject(speicher, karte)
+    ok = u.UpdateLayeredWindow(hwnd, schirm, ctypes.byref(_PUNKT(x, y)), ctypes.byref(_MASS(w, h)),
+                               speicher, ctypes.byref(_PUNKT(0, 0)), 0,
+                               ctypes.byref(_MISCHUNG(0, 0, 255, 1)), 2)
+    g.SelectObject(speicher, alt)
+    g.DeleteObject(karte)
+    g.DeleteDC(speicher)
+    u.ReleaseDC(None, schirm)
+    return bool(ok)
+
+
 # ------------------------------ API -----------------------------------------
 
 
@@ -1568,7 +1814,10 @@ class TickerApp:
         self.cfg["pos_x"], self.cfg["pos_y"] = x, y
         self.root.geometry(f"+{x}+{y}")
 
-        self.frame = tk.Frame(self.root, bg=self.th["bg"], padx=10, pady=8)
+        self._baue_platte()
+        # Mit Beschlag hält die Platte den Abstand zum Rand, ohne ihn der Rahmen selbst.
+        self.frame = tk.Frame(self.root, bg=self.th["bg"],
+                              padx=3 if self.platte else 10, pady=1 if self.platte else 8)
         self.frame.pack()
 
         self.title_lbl = tk.Label(self.frame, text=tx("titel"),
@@ -1585,7 +1834,64 @@ class TickerApp:
         self.status_lbl.pack(anchor="w")
 
         self._bind_drag_recursive(self.root)
+        self.root.bind("<Configure>", self._root_bewegt, add="+")
         self.root.protocol("WM_DELETE_WINDOW", self.quit)
+
+    # ---------- Beschlag ----------
+
+    def _baue_platte(self):
+        """Das Fenster hinter der Anzeige: Platte, Rahmen, Schrauben, Schatten."""
+        self.platte = None
+        self._platte_hwnd = None
+        self._platte_bild = None
+        self._platte_mass = None
+        self._platte_stand = None
+        if os.name != "nt":
+            return
+        try:
+            p = tk.Toplevel(self.root)
+            p.withdraw()
+            p.overrideredirect(True)
+            p.attributes("-topmost", True)
+            p.configure(bg=self.th["bg"])
+            p.update_idletasks()
+            self._platte_hwnd = schicht_vorbereiten(p.winfo_id())
+            self.platte = p
+        except Exception:               # ohne Beschlag läuft die Anzeige trotzdem
+            self.platte = None
+
+    def _root_bewegt(self, e):
+        if e.widget is self.root:
+            self._platte_folgen()
+
+    def _platte_folgen(self, x=None, y=None):
+        """Zieht die Platte hinter die Anzeige: neue Stelle, bei Bedarf neues Bild
+        (andere Größe, anderes Theme, andere Deckkraft)."""
+        if not self.platte or not self.visible:
+            return
+        w, h = self.root.winfo_width(), self.root.winfo_height()
+        if w <= 1 or h <= 1:
+            return
+        if x is None:
+            x, y = self.root.winfo_x(), self.root.winfo_y()
+        mass = (w, h, self.alpha_pct, self.theme_name)
+        if self._platte_mass != mass:
+            self._platte_bild = beschlag_bild(w, h, self.alpha_pct / 100.0,
+                                              self.th["bg"], self.th["title"])
+            self._platte_mass = mass
+        px, py = x - B_RAND - B_LUFT, y - B_RAND - B_LUFT
+        if self._platte_stand == (mass, px, py):
+            return
+        try:
+            bw, bh = self._platte_bild.size
+            self.platte.geometry(f"{bw}x{bh}+{px}+{py}")
+            if schicht_zeigen(self._platte_hwnd, self._platte_bild, px, py):
+                self._platte_stand = (mass, px, py)
+            if self.platte.state() == "withdrawn":
+                self.platte.deiconify()
+                self.root.lift()
+        except (tk.TclError, OSError):
+            pass
 
     def _bind_drag_recursive(self, widget):
         widget.bind("<Button-1>", self._drag_start)
@@ -1603,6 +1909,7 @@ class TickerApp:
         ox, oy = getattr(self, "_drag_off", (0, 0))
         x, y = event.x_root - ox, event.y_root - oy
         self.root.geometry(f"+{x}+{y}")
+        self._platte_folgen(x, y)
         # Position nur merken, NICHT speichern: sonst schriebe jede
         # einzelne Mausbewegung die config.json (mit dem Token darin).
         self.cfg["pos_x"], self.cfg["pos_y"] = x, y
@@ -1657,6 +1964,7 @@ class TickerApp:
         self.title_lbl.configure(fg=t["title"], bg=t["bg"])
         self.status_lbl.configure(fg=t["muted"], bg=t["bg"])
         self._render()
+        self._platte_folgen()
 
     def _render(self):
         t = self.th
@@ -1973,6 +2281,7 @@ class TickerApp:
         def on_alpha(_v=None):
             self.alpha_pct = int(self._alpha_var.get())
             self.root.attributes("-alpha", self.alpha_pct / 100.0)
+            self._platte_folgen()
             self.cfg["alpha_pct"] = self.alpha_pct
             save_config(self.cfg)
 
@@ -2257,8 +2566,12 @@ class TickerApp:
         if self.visible:
             self.root.deiconify()
             self.root.attributes("-topmost", True)
+            self._platte_stand = None
+            self.root.after(30, self._platte_folgen)
         else:
             self.root.withdraw()
+            if self.platte:
+                self.platte.withdraw()
 
     def quit(self):
         self.stop_event.set()

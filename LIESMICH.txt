@@ -1,4 +1,4 @@
-Besucher-Ticker v1.1.6
+Besucher-Ticker v1.2.0
 ====================
 Overlay fuer die eigenen GoatCounter-Zahlen. Schwarz, pinke Schrift,
 blaue Balken.

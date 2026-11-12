@@ -6,7 +6,7 @@
 
 [English version](README.md)
 
-<img src="assets/screenshot-de.png" alt="Das Overlay des Besucher-Tickers mit Beispielzahlen: oben die große Zahl der Aufrufe der letzten 7 Tage, daneben der Heute- und der Gesamtwert, darunter sechs blaue Balken für die Besucher je Werkzeug, dann die Länder und die Uhrzeit der letzten Aktualisierung." width="210">
+<img src="assets/screenshot-de.png" alt="Das Overlay des Besucher-Tickers mit Beispielzahlen: oben die große Zahl der Aufrufe der letzten 7 Tage, daneben der Heute- und der Gesamtwert, darunter sechs blaue Balken für die Besucher je Werkzeug, dann die Länder und die Uhrzeit der letzten Aktualisierung, alles auf einer schwarzen Platte mit eckigem Rahmen und vier kleinen Schrauben." width="300">
 
 ---
 
@@ -62,7 +62,7 @@ Das Token liegt in der `config.json` neben dem Programm, mit `pywin32` per Windo
 
 ## Unter der Haube
 
-Eine Datei, rund 2.400 Zeilen, drei Fremdpakete (`requests`, `pystray`, `pillow`; `pywin32` optional), alles andere ist Python-Standardbibliothek.
+Eine Datei, rund 2.700 Zeilen, drei Fremdpakete (`requests`, `pystray`, `pillow`; `pywin32` optional), alles andere ist Python-Standardbibliothek.
 
 - Ein Durchlauf braucht 3 bis 4 Anfragen, nacheinander. GoatCounter erlaubt 4 je Sekunde. Selbst die schnellste Stufe (15 s) bleibt weit darunter, und Sekundenstufen gibt es bewusst nicht.
 - Die Gesamtsumme wird höchstens alle 10 Minuten frisch geholt: Sie ändert sich träge, und jede Abfrage kostet eine Anfrage.

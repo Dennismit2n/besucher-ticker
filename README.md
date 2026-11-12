@@ -6,7 +6,7 @@
 
 [Deutsche Fassung](README.de.md) · The app speaks 14 languages.
 
-<img src="assets/screenshot-en.png" alt="The Besucher-Ticker overlay with sample numbers: the big pageview count of the last 7 days at the top, today’s and the all-time value beside it, below that six blue bars for visitors per tool, then the countries and the time of the last refresh." width="210">
+<img src="assets/screenshot-en.png" alt="The Besucher-Ticker overlay with sample numbers: the big pageview count of the last 7 days at the top, today’s and the all-time value beside it, below that six blue bars for visitors per tool, then the countries and the time of the last refresh, all on a black plate with a square frame and four small screws." width="300">
 
 ---
 
@@ -62,7 +62,7 @@ The token lives in `config.json` next to the program, encrypted via Windows DPAP
 
 ## Under the hood
 
-One file, around 2,400 lines, three third-party packages (`requests`, `pystray`, `pillow`; `pywin32` optional), everything else is the Python standard library.
+One file, around 2,700 lines, three third-party packages (`requests`, `pystray`, `pillow`; `pywin32` optional), everything else is the Python standard library.
 
 - One refresh takes 3 to 4 requests, one after another. GoatCounter allows 4 per second. Even the fastest setting (15 s) stays far below that, and there are deliberately no per-second settings.
 - The all-time total is fetched at most every 10 minutes: it changes slowly, and every query costs a request.
