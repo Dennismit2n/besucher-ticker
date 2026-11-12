@@ -72,7 +72,7 @@ The token lives in `config.json` next to the program, encrypted via Windows DPAP
 
 One file, around 3,000 lines, three third-party packages (`requests`, `pystray`, `pillow`; `pywin32` optional), everything else is the Python standard library.
 
-- One refresh takes 2 to 5 requests, one after another, at least 0.26 s apart. GoatCounter allows 4 per second. With tile clicks, `/stats/hits` is paged through 100 paths at a time (`exclude_paths`), at most 10 pages. Even the fastest setting (15 s) stays far below the limit, and there are deliberately no per-second settings.
+- One refresh takes 2 to 5 requests, one after another, at least 0.26 s apart, so never more than 4 per second, which is what GoatCounter allows. With tile clicks, `/stats/hits` is paged through 100 paths at a time (`exclude_paths`, at most 20 pages), one request per 100 paths. The all-time list is fetched at most every 10 minutes. Even the fastest setting (15 s) stays far below the limit, and there are deliberately no per-second settings.
 - The all-time total is fetched at most every 10 minutes: it changes slowly, and every query costs a request.
 - On HTTP 429 the ticker waits as long as the server asks. GoatCounter reports that in the `X-Rate-Limit-Reset` header, with `Retry-After` as the fallback.
 - `python besucher_ticker.py --selbsttest` checks the arithmetic and mapping logic without network and without a window.

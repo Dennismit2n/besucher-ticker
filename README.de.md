@@ -72,7 +72,7 @@ Das Token liegt in der `config.json` neben dem Programm, mit `pywin32` per Windo
 
 Eine Datei, rund 3.000 Zeilen, drei Fremdpakete (`requests`, `pystray`, `pillow`; `pywin32` optional), alles andere ist Python-Standardbibliothek.
 
-- Ein Durchlauf braucht 2 bis 5 Anfragen, nacheinander und mindestens 0,26 s auseinander. GoatCounter erlaubt 4 je Sekunde. Bei den Kachel-Klicks wird `/stats/hits` in Schritten von 100 Pfaden durchgeblättert (`exclude_paths`), höchstens 10 Seiten. Selbst die schnellste Stufe (15 s) bleibt weit unter der Grenze, und Sekundenstufen gibt es bewusst nicht.
+- Ein Durchlauf braucht 2 bis 5 Anfragen, nacheinander und mindestens 0,26 s auseinander, also nie mehr als die 4 je Sekunde, die GoatCounter erlaubt. Bei den Kachel-Klicks wird `/stats/hits` in Schritten von 100 Pfaden durchgeblättert (`exclude_paths`, höchstens 20 Seiten), eine Anfrage je 100 Pfade. Die Liste seit Anbeginn wird höchstens alle 10 Minuten geholt. Selbst die schnellste Stufe (15 s) bleibt weit unter der Grenze, und Sekundenstufen gibt es bewusst nicht.
 - Die Gesamtsumme wird höchstens alle 10 Minuten frisch geholt: Sie ändert sich träge, und jede Abfrage kostet eine Anfrage.
 - Bei HTTP 429 wartet der Ticker, so lange der Server es verlangt. GoatCounter meldet das im Kopffeld `X-Rate-Limit-Reset`, ersatzweise `Retry-After`.
 - `python besucher_ticker.py --selbsttest` prüft die Rechen- und Zuordnungslogik ohne Netz und ohne Fenster.

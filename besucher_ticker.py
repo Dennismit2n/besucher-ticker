@@ -115,7 +115,8 @@ UA = "BesucherTicker/1.3.0 (personal read-only GoatCounter display)"
 BAR_W, BAR_H = 190, 8
 
 # GoatCounter erlaubt 4 Anfragen pro Sekunde. Ein Durchlauf braucht
-# 2–5 Anfragen (Kachel-Klicks: eine je 100 Pfade mehr), die nacheinander
+# 2–5 Anfragen (Kachel-Klicks: eine je 100 Pfade mehr, höchstens
+# HITS_SEITEN_MAX je Liste), die nacheinander
 # laufen, mit mindestens API_ABSTAND Sekunden dazwischen. Nacheinander
 # allein reicht nicht: Antwortet der Server in 0,1 s, wären das sonst
 # zehn Anfragen je Sekunde. Trotzdem keine Sekundenstufen:
@@ -169,9 +170,10 @@ DEFAULT_ZAEHLART = "auto"
 # Kacheln schickt: "kachel-<werkzeug>" und "kachel-<werkzeug>-<teil>".
 KACHEL_PRAEFIX = "kachel-"
 
-# /stats/hits liefert höchstens 100 Pfade je Anfrage. Für die Summe aller
-# Kachel-Klicks wird weitergeblättert, aber nie mehr als so viele Seiten.
-HITS_SEITEN_MAX = 10
+# /stats/hits liefert höchstens 100 Pfade je Anfrage, die meistbesuchten
+# zuerst. Für die Summe aller Kachel-Klicks wird weitergeblättert, aber nie
+# mehr als so viele Seiten (2000 Pfade; die Werkstatt hat gut 300).
+HITS_SEITEN_MAX = 20
 
 # ------------------------------ Themes --------------------------------------
 # Bewusst nur drei. Der Wunsch war eindeutig: schwarz, pinke Schrift,
@@ -352,11 +354,11 @@ TEXTE: dict[str, dict[str, str]] = {
     },
     "es": {
         "_name": "Español",
-        "titel": "Visitas",
+        "titel": "Visitantes",
         "lade": "cargando…",
         "heuteN": "{n} hoy",
         "gesamtN": "{n} en total",
-        "jeWerkzeug": "Visitas por herramienta",
+        "jeWerkzeug": "Visitantes por herramienta",
         "artAuto": "automático",
         "artSeiten": "Visitas a páginas",
         "artKlicks": "Clics en tarjetas",
@@ -547,7 +549,7 @@ TEXTE: dict[str, dict[str, str]] = {
         "artSeiten": "Paginabezoeken",
         "artKlicks": "Tegelklikken",
         "jeKachel": "Klikken per tegel",
-        "mZaehlart": "Telling",
+        "mZaehlart": "Telwijze",
         "setZaehlart": "Wat er geteld wordt",
         "startseite": "Startpagina",
         "zeitHeute": "Vandaag",
@@ -1959,6 +1961,11 @@ class TickerApp:
         # Kachel-Klicks die Gesamtsumme und entscheidet "automatisch".
         self._alltime_hits: list[dict] | None = None
         self._alltime_hits_zeit = 0.0
+        # Zählt jeden Zugangswechsel. Ein Abruf, der noch für die alte Seite
+        # lief, legt sein Ergebnis dann nicht mehr ab.
+        self._zugang_gen = 0
+        # "automatisch" hat schon einmal Kachel-Klicks gesehen (bleibt so).
+        self._auto_klicks = False
 
         self.compact = bool(self.cfg.get("compact", False))
         self.visible = True
@@ -1980,8 +1987,9 @@ class TickerApp:
     def th(self) -> dict:
         return THEMES[self.theme_name]
 
-    def zeitraum_name(self) -> str:
-        return tx(next((n for k, n, _ in ZEITRAEUME if k == self.zeitraum), "zeitHeute"))
+    def zeitraum_name(self, key: str | None = None) -> str:
+        key = key or self.zeitraum
+        return tx(next((n for k, n, _ in ZEITRAEUME if k == key), "zeitHeute"))
 
     def zusatz_page(self) -> str | None:
         return next((p for k, _, p in ZUSATZ_CHOICES if k == self.zusatz), None)
@@ -2164,7 +2172,8 @@ class TickerApp:
         for w in self.body.winfo_children():
             w.destroy()
 
-        self.title_lbl.config(text=f"{tx('titel')} · {self.zeitraum_name()}")
+        self.title_lbl.config(text=f"{tx('titel')} · "
+                                   f"{self.zeitraum_name(self.daten.get('zeitraum'))}")
 
         if not self.daten:
             self._bind_drag_recursive(self.root)
@@ -2177,12 +2186,15 @@ class TickerApp:
         # "automatisch".
         klicks = self.daten.get("art") == "klicks"
         gross = tx("artKlicks" if klicks else "artSeiten")
+        # Die Zahlen gehören zu dem Zeitraum, mit dem sie geholt wurden. Bis
+        # der nächste Durchlauf da ist, bleibt deshalb dessen Name stehen.
+        zr_daten = self.daten.get("zeitraum", self.zeitraum)
 
         if self.compact:
             tk.Label(self.body, text=zahl_kurz(zeitraum_total),
                      fg=t["big"], bg=t["bg"],
                      font=("Segoe UI", 16, "bold")).pack(anchor="w")
-            tk.Label(self.body, text=f"{gross} · {self.zeitraum_name()}",
+            tk.Label(self.body, text=f"{gross} · {self.zeitraum_name(zr_daten)}",
                      fg=t["muted"], bg=t["bg"],
                      font=("Segoe UI", 8)).pack(anchor="w")
             self._bind_drag_recursive(self.root)
@@ -2198,10 +2210,10 @@ class TickerApp:
                  font=("Segoe UI", 18, "bold")).pack(side="left")
         rechts = tk.Frame(kopf, bg=t["bg"])
         rechts.pack(side="right", anchor="s")
-        tk.Label(rechts, text=f"{gross} · {self.zeitraum_name()}",
+        tk.Label(rechts, text=f"{gross} · {self.zeitraum_name(zr_daten)}",
                  fg=t["muted"], bg=t["bg"],
                  font=("Segoe UI", 8)).pack(anchor="e")
-        if self.zeitraum != "heute":
+        if zr_daten != "heute":
             tk.Label(rechts, text=tx("heuteN", n=zahl_kurz(heute)),
                      fg=t["text"], bg=t["bg"],
                      font=("Segoe UI", 9, "bold")).pack(anchor="e")
@@ -2333,7 +2345,7 @@ class TickerApp:
         self.ui_queue.put(("center", None))
 
     def _tray_refresh(self, *_):
-        threading.Thread(target=self._refresh_once, daemon=True).start()
+        self.wake_event.set()
 
     def _tray_settings(self, *_):
         self.ui_queue.put(("settings", None))
@@ -2589,14 +2601,14 @@ class TickerApp:
         self.cfg["zeitraum"] = key
         save_config(self.cfg)
         self._render()
-        threading.Thread(target=self._refresh_once, daemon=True).start()
+        self.wake_event.set()               # siehe _refresh_loop
 
     def _set_zusatz(self, key: str):
         self.zusatz = key
         self.cfg["zusatz"] = key
         save_config(self.cfg)
         self._render()
-        threading.Thread(target=self._refresh_once, daemon=True).start()
+        self.wake_event.set()
 
     def _set_zaehlart(self, key: str):
         if key not in [k for k, _ in ZAEHLARTEN]:
@@ -2605,7 +2617,7 @@ class TickerApp:
         self.cfg["zaehlart"] = key
         save_config(self.cfg)
         self._alltime_wert = None           # Gesamtsumme gehört zur Zählweise
-        threading.Thread(target=self._refresh_once, daemon=True).start()
+        self.wake_event.set()
 
     def _next_theme(self):
         idx = (THEME_NAMES.index(self.theme_name) + 1) % len(THEME_NAMES)
@@ -2634,6 +2646,10 @@ class TickerApp:
     # ---------- Worker ----------
 
     def _refresh_loop(self):
+        # Einziger Ort, der abruft. Wer neue Zahlen will (Zeitraum, Zusatz,
+        # Zählweise, Zugang, "Jetzt aktualisieren"), setzt wake_event: Läuft
+        # gerade ein Durchlauf, folgt der nächste direkt danach, statt dass
+        # ein zweiter Thread am Schloss abprallt und die Änderung verpufft.
         backoff_idx = 0
         while not self.stop_event.is_set():
             ok, wait_hint = self._refresh_once()
@@ -2711,6 +2727,7 @@ class TickerApp:
 
             self.ui_queue.put(("data", {
                 "art": art,
+                "zeitraum": zeitraum,
                 "heute": heute_total,
                 "zeitraum_total": zeitraum_total,
                 "balken": balken,
@@ -2730,15 +2747,25 @@ class TickerApp:
         finally:
             self._refresh_lock.release()
 
+    def _zugang_neu(self):
+        """Andere Seite oder anderes Token: alles Gemerkte gehört zur alten."""
+        self._zugang_gen += 1
+        self._alltime_wert = None
+        self._alltime_hits = None
+        self._auto_klicks = False
+
     def _gesamt_holen(self, ende: str) -> int | None:
         """Gesamtsumme der Seitenbesuche, höchstens alle 10 Minuten frisch."""
         if (self._alltime_wert is not None
                 and time.monotonic() - self._alltime_zeit < ALLTIME_CACHE_SECONDS):
             return self._alltime_wert
+        gen = self._zugang_gen
         try:
             wert = besucher_seiten(self.api.total(ALLTIME_START, ende))
         except (requests.RequestException, ValueError, LookupError):
             return self._alltime_wert          # alter Wert ist besser als keiner
+        if gen != self._zugang_gen:
+            return wert                        # Zugang inzwischen gewechselt
         self._alltime_wert = wert
         self._alltime_zeit = time.monotonic()
         return wert
@@ -2752,12 +2779,15 @@ class TickerApp:
         if (self._alltime_hits is not None
                 and alter < (FRISCH_SEKUNDEN if frisch else ALLTIME_CACHE_SECONDS)):
             return self._alltime_hits
+        gen = self._zugang_gen
         try:
             hits = self.api.hits_alle(ALLTIME_START, ende)
         except (requests.RequestException, ValueError, LookupError):
             if self._alltime_hits is None:
                 raise
             return self._alltime_hits
+        if gen != self._zugang_gen:
+            return hits                        # Zugang inzwischen gewechselt
         self._alltime_hits = hits
         self._alltime_hits_zeit = time.monotonic()
         return hits
@@ -2769,7 +2799,14 @@ class TickerApp:
         art = self.zaehlart
         if art in ("seiten", "klicks"):
             return art
-        return "klicks" if hat_kachel_klicks(self._alltime_hits_holen(ende)) else "seiten"
+        try:
+            if hat_kachel_klicks(self._alltime_hits_holen(ende)):
+                self._auto_klicks = True
+        except (requests.RequestException, ValueError, LookupError):
+            # Ohne Liste lässt sich nichts Neues entscheiden. Seitenbesuche
+            # brauchen sie nicht, also daran soll der Durchlauf nicht scheitern.
+            pass
+        return "klicks" if self._auto_klicks else "seiten"
 
     # ---------- Queue / Mainloop ----------
 
@@ -2834,9 +2871,8 @@ class TickerApp:
         self.cfg["api_token"] = token
         save_config(self.cfg)
         self.api.set_zugang(site, token)
-        self._alltime_wert = None
-        self._alltime_hits = None           # andere Seite, andere Pfade
-        threading.Thread(target=self._refresh_once, daemon=True).start()
+        self._zugang_neu()
+        self.wake_event.set()
 
     def _toggle_visible(self):
         self.visible = not self.visible
@@ -2970,6 +3006,71 @@ def selbsttest() -> int:
            [None, "1,2", "1,2,3"])
     fake2 = _FakeAPI()
     pruefe("blaettern grenze", len(fake2.hits_alle("a", "b", max_seiten=2)), 3)
+
+    # Ganze Durchläufe ohne Fenster: eine App ohne __init__ und eine API,
+    # die nach Zeitraum antwortet ('2020…' = seit Anbeginn).
+    class _ZeitAPI:
+        def __init__(self, anbeginn, heute, fehler=False):
+            self.anbeginn, self.heute, self.fehler = anbeginn, heute, fehler
+            self.abrufe = 0
+
+        def _liste(self, start):
+            self.abrufe += 1
+            if self.fehler:
+                raise requests.ConnectionError("weg")
+            return self.anbeginn if start == ALLTIME_START else self.heute
+
+        def hits_alle(self, start, end):
+            return list(self._liste(start))
+
+        def hits(self, start, end, limit=100):
+            return {"hits": self._liste(start)}
+
+        def total(self, start, end):
+            liste = self._liste(start)
+            return {"total": sum(h["count"] for h in liste),
+                    "total_events": sum(h["count"] for h in liste if h["event"])}
+
+    def _app(api, art="auto", zeitraum="heute"):
+        a = TickerApp.__new__(TickerApp)
+        a.api, a.zaehlart, a.zeitraum, a.zusatz, a.max_balken = api, art, zeitraum, "aus", 8
+        a._alltime_wert, a._alltime_zeit = None, 0.0
+        a._alltime_hits, a._alltime_hits_zeit = None, 0.0
+        a._zugang_gen, a._auto_klicks = 0, False
+        a._refresh_lock, a.ui_queue = threading.Lock(), queue.Queue()
+        return a
+
+    alt = [{"path": "/", "count": 50, "event": False, "title": ""},
+           {"path": "kachel-ram", "count": 4, "event": True, "title": "Real_RAM_cooler"}]
+    neu = [{"path": "kachel-ram-news", "count": 2, "event": True, "title": "Real_RAM_cooler"},
+           {"path": "kachel-wifi", "count": 1, "event": True, "title": "WiFi QR Card"}]
+    a1 = _app(_ZeitAPI(alt + neu, neu))
+    pruefe("auto kacheln", a1._zaehlart_wirksam("x"), "klicks")
+    n = a1.api.abrufe
+    a1._zaehlart_wirksam("x")
+    pruefe("auto zwischenspeicher", a1.api.abrufe, n)
+    a2 = _app(_ZeitAPI(alt[:1], alt[:1]))
+    pruefe("auto ohne kacheln", a2._zaehlart_wirksam("x"), "seiten")
+    a3 = _app(_ZeitAPI([], [], fehler=True))
+    pruefe("auto netzfehler", a3._zaehlart_wirksam("x"), "seiten")
+    a1._alltime_hits_zeit -= ALLTIME_CACHE_SECONDS + 1    # Liste veraltet
+    a1.api.fehler = True
+    pruefe("auto merkt kacheln", a1._zaehlart_wirksam("x"), "klicks")
+    a1._zugang_neu()
+    pruefe("zugang vergisst", (a1._alltime_hits, a1._auto_klicks, a1._zugang_gen),
+           (None, False, 1))
+
+    a4 = _app(_ZeitAPI(alt + neu, neu), zeitraum="gesamt")
+    pruefe("durchlauf klicks ok", a4._refresh_once(), (True, None))
+    d = a4.ui_queue.get_nowait()[1]
+    pruefe("durchlauf klicks", (d["art"], d["zeitraum"], d["heute"], d["zeitraum_total"],
+                                d["gesamt"], [b["label"] for b in d["balken"]]),
+           ("klicks", "gesamt", 3, 7, 7, ["Real_RAM_cooler", "WiFi QR Card"]))
+    a5 = _app(_ZeitAPI(alt + neu, neu), art="seiten", zeitraum="7t")
+    a5._refresh_once()
+    d = a5.ui_queue.get_nowait()[1]
+    pruefe("durchlauf seiten", (d["art"], d["heute"], d["gesamt"], d["balken"]),
+           ("seiten", 0, 50, []))
 
     # Zusatzliste
     stats = {"stats": [{"name": "Germany", "count": 4},
