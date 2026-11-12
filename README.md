@@ -6,7 +6,7 @@
 
 [Deutsche Fassung](README.de.md) · The app speaks 14 languages.
 
-<img src="assets/screenshot-en.png" alt="The Besucher-Ticker overlay with sample numbers: the big pageview count of the last 7 days at the top, today’s and the all-time value beside it, below that six blue bars for visitors per tool, then the countries and the time of the last refresh, all on a black plate with a square frame and four small screws." width="300">
+<img src="assets/screenshot-en.png" alt="The Besucher-Ticker overlay with sample numbers: the big count of tile clicks in the last 7 days at the top, today’s and the all-time value beside it, below that six blue bars for clicks per tile, then the countries and the time of the last refresh, all on a black plate with a square frame and four small screws." width="300">
 
 ---
 
@@ -23,7 +23,7 @@ A website of your own that counts with GoatCounter. The ticker does not count an
 | | |
 |---|---|
 | **Big number** | the total for the chosen period (today / 7 days / 30 days / all time), with today’s and the all-time value beside it |
-| **Bars** | one bar per tool. Subpages are folded into their page, mini tiles into their tile |
+| **Bars** | one bar per tool, as many as you like (3 to 20 or all). Subpages are folded into their page, mini tiles into their tile |
 | **Extra block** | countries or referrers, or off |
 
 **What is counted** (tray menu → **Counting**):
@@ -34,7 +34,7 @@ A website of your own that counts with GoatCounter. The ticker does not count an
 | **Tile clicks** | only events whose name starts with `kachel-`: `kachel-ram` for a click on a tile, `kachel-ram-anleitung` for a mini tile inside it. That is how the [workshop](https://dennismit2n.github.io/) has reported clicks on its tiles since 12 November 2026, and nothing else. The bar is named after the title the page sends along |
 | **automatic** (default) | tile clicks as soon as the site has ever reported one, page visits otherwise |
 
-The big number is the total of all pages or of all tiles. The bars show only the biggest tools; if they all fit, together they add up to exactly that number.
+The big number is the total of all pages or of all tiles. With “all” bars, together they add up to exactly that number; otherwise they show the biggest tools.
 
 GoatCounter counts *visitors*, not single views or clicks: if someone opens the same page or clicks the same tile several times during one visit, it counts once. The labels say so (up to version 1.2.0 the big number was called “Views” and also contained click events).
 
@@ -56,9 +56,27 @@ pythonw besucher_ticker.py
 
 | | |
 |---|---|
-| Drag | move the overlay, the position is saved when you let go |
+| Drag | move the overlay, the position is saved when you let go (unless it is locked) |
 | Double-click | switch between small and large |
-| Right-click the tray icon | overlay on/off, bring to centre, refresh now, period, extra block, counting, settings, themes, change access, language, quit |
+| Right-click the tray icon | overlay on/off, bring to centre, refresh now, period, extra block, counting, number of bars, entries with 0, bars on one line, always on top, lock position, settings, themes, change access, language, quit |
+
+## Settings
+
+The settings window has two columns. On the left is what is shown, on the right how it looks and behaves.
+
+| | |
+|---|---|
+| **Number of bars** | 3 to 20 or **all**: then every counter gets its bar, even if the overlay grows as tall as the screen |
+| **Also show entries with 0** | every tile or page that was ever counted gets a bar, even with 0 in the chosen period |
+| **Bars on one line** | name, bar and number on one line, half the height. That way even all tiles fit on one screen |
+| **Rows in the extra block** | 3 to 10 countries or referrers |
+| **Size** | small, normal, large, extra large: text and bars grow with it |
+| **Opacity, colours, mini/maxi, update frequency** | as before |
+| **Always on top** | off: the overlay may slip behind other windows, a click brings it back to the front |
+| **Lock position** | the overlay can no longer be moved by accident |
+| **Start with Windows** | adds the ticker to autostart for your user account (`HKCU\…\Run`); untick it and it is gone again |
+
+If the overlay grows past the bottom of the screen, it moves up by itself until it fits.
 
 Overlay gone? **Bring overlay to centre** in the menu. That happens when a second monitor was unplugged: the overlay is borderless and has no title bar to drag it back by.
 
@@ -70,7 +88,7 @@ The token lives in `config.json` next to the program, encrypted via Windows DPAP
 
 ## Under the hood
 
-One file, around 3,000 lines, three third-party packages (`requests`, `pystray`, `pillow`; `pywin32` optional), everything else is the Python standard library.
+One file, around 3,700 lines, three third-party packages (`requests`, `pystray`, `pillow`; `pywin32` optional), everything else is the Python standard library.
 
 - One refresh takes 2 to 5 requests, one after another, at least 0.26 s apart, so never more than 4 per second, which is what GoatCounter allows. With tile clicks, `/stats/hits` is paged through 100 paths at a time (`exclude_paths`, at most 20 pages), one request per 100 paths. The all-time list is fetched at most every 10 minutes. Even the fastest setting (15 s) stays far below the limit, and there are deliberately no per-second settings.
 - The all-time total is fetched at most every 10 minutes: it changes slowly, and every query costs a request.

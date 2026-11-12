@@ -1,5 +1,5 @@
 """
-Besucher-Ticker v1.3.0 · GoatCounter-Overlay + System-Tray (Windows)
+Besucher-Ticker v1.4.0 · GoatCounter-Overlay + System-Tray (Windows)
 ==================================================================
 Zeigt die Besucherzahlen der eigenen GoatCounter-Seite live als
 schwebendes, halbtransparentes Overlay. An/Aus über das Tray-Icon.
@@ -110,9 +110,11 @@ LOCK_PATH = os.path.join(_BASE_DIR, ".besucher.lock")
 RETRY_BACKOFF = (10, 30, 60)          # Sekunden nach normalen Fehlern
 RATE_LIMIT_BACKOFF = (30, 120, 300)   # nach HTTP 429
 RATE_LIMIT_MAX_WAIT = 3600
-UA = "BesucherTicker/1.3.0 (personal read-only GoatCounter display)"
+UA = "BesucherTicker/1.4.0 (personal read-only GoatCounter display)"
 
 BAR_W, BAR_H = 190, 8
+# Einzeilige Balken (Einstellung "dicht"): kürzere Rinne, Namen gekappt.
+DICHT_BAR_W, DICHT_NAME_MAX = 90, 18
 
 # GoatCounter erlaubt 4 Anfragen pro Sekunde. Ein Durchlauf braucht
 # 2–5 Anfragen (Kachel-Klicks: eine je 100 Pfade mehr, höchstens
@@ -155,8 +157,27 @@ ALLTIME_START = "2020-01-01T00:00:00Z"
 ALLTIME_CACHE_SECONDS = 600           # Gesamtsumme ändert sich träge
 FRISCH_SEKUNDEN = 10                  # "frisch" = aus demselben Durchlauf
 
-MAX_BALKEN_CHOICES = [3, 5, 8, 10, 12, 15]
+# 0 heißt "alle": jeder Zähler bekommt seinen Balken, auch wenn das
+# Overlay dann einen ganzen Bildschirm hoch wird.
+MAX_BALKEN_CHOICES = [3, 5, 8, 10, 12, 15, 20, 0]
 DEFAULT_MAX_BALKEN = 8
+
+# Zeilen im Zusatzblock (Länder, Verweise)
+ZUSATZ_ZEILEN_CHOICES = [3, 4, 5, 8, 10]
+DEFAULT_ZUSATZ_ZEILEN = 4
+
+# Größe der Anzeige in Prozent: Schrift und Balken wachsen mit.
+GROESSEN = [
+    (90, "grKlein"),
+    (100, "grNormal"),
+    (120, "grGross"),
+    (140, "grSehrGross"),
+]
+DEFAULT_GROESSE = 100
+
+# Autostart: ein Eintrag unter HKCU\...\Run, nur für den eigenen Benutzer.
+AUTOSTART_SCHLUESSEL = r"Software\Microsoft\Windows\CurrentVersion\Run"
+AUTOSTART_NAME = "BesucherTicker"
 
 # Was gezählt wird: Schlüssel -> Textschlüssel. Siehe oben "Zu den Zahlen".
 ZAEHLARTEN = [
@@ -273,6 +294,20 @@ TEXTE: dict[str, dict[str, str]] = {
         "setZeitraum": "Zeitraum für Balken und Zwischensumme",
         "setZusatz": "Zusatzblock unter den Balken",
         "setBalken": "Höchstens so viele Balken",
+        "balkenAlle": "alle",
+        "mBalken": "Anzahl Balken",
+        "setNullen": "Auch Einträge mit 0 zeigen",
+        "setDicht": "Balken einzeilig (spart Platz)",
+        "setZusatzZeilen": "Zeilen im Zusatzblock",
+        "setGroesse": "Größe",
+        "grKlein": "klein",
+        "grNormal": "normal",
+        "grGross": "groß",
+        "grSehrGross": "sehr groß",
+        "setVerhalten": "Verhalten",
+        "setVordergrund": "Immer im Vordergrund",
+        "setSperren": "Position sperren",
+        "setAutostart": "Mit Windows starten",
         "setAlpha": "Transparenz ({min}–{max} %)",
         "setMiniMaxi": "Mini-/Maxi-Modus",
         "mini": "Mini",
@@ -335,6 +370,20 @@ TEXTE: dict[str, dict[str, str]] = {
         "setZeitraum": "Time range for bars and subtotal",
         "setZusatz": "Extra block below the bars",
         "setBalken": "At most this many bars",
+        "balkenAlle": "all",
+        "mBalken": "Number of bars",
+        "setNullen": "Also show entries with 0",
+        "setDicht": "Bars on one line (saves space)",
+        "setZusatzZeilen": "Rows in the extra block",
+        "setGroesse": "Size",
+        "grKlein": "small",
+        "grNormal": "normal",
+        "grGross": "large",
+        "grSehrGross": "extra large",
+        "setVerhalten": "Behaviour",
+        "setVordergrund": "Always on top",
+        "setSperren": "Lock position",
+        "setAutostart": "Start with Windows",
         "setAlpha": "Opacity ({min} to {max} %)",
         "setMiniMaxi": "Mini/maxi mode",
         "mini": "Mini",
@@ -397,6 +446,20 @@ TEXTE: dict[str, dict[str, str]] = {
         "setZeitraum": "Periodo para barras y subtotal",
         "setZusatz": "Bloque extra bajo las barras",
         "setBalken": "Como máximo tantas barras",
+        "balkenAlle": "todas",
+        "mBalken": "Número de barras",
+        "setNullen": "Mostrar también entradas con 0",
+        "setDicht": "Barras en una línea (ahorra espacio)",
+        "setZusatzZeilen": "Líneas en el bloque extra",
+        "setGroesse": "Tamaño",
+        "grKlein": "pequeño",
+        "grNormal": "normal",
+        "grGross": "grande",
+        "grSehrGross": "muy grande",
+        "setVerhalten": "Comportamiento",
+        "setVordergrund": "Siempre en primer plano",
+        "setSperren": "Bloquear posición",
+        "setAutostart": "Iniciar con Windows",
         "setAlpha": "Opacidad (de {min} a {max} %)",
         "setMiniMaxi": "Modo mini/maxi",
         "mini": "Mini",
@@ -459,6 +522,20 @@ TEXTE: dict[str, dict[str, str]] = {
         "setZeitraum": "Période pour les barres et le sous-total",
         "setZusatz": "Bloc supplémentaire sous les barres",
         "setBalken": "Au plus autant de barres",
+        "balkenAlle": "toutes",
+        "mBalken": "Nombre de barres",
+        "setNullen": "Afficher aussi les entrées à 0",
+        "setDicht": "Barres sur une ligne (gain de place)",
+        "setZusatzZeilen": "Lignes du bloc supplémentaire",
+        "setGroesse": "Taille",
+        "grKlein": "petite",
+        "grNormal": "normale",
+        "grGross": "grande",
+        "grSehrGross": "très grande",
+        "setVerhalten": "Comportement",
+        "setVordergrund": "Toujours au premier plan",
+        "setSperren": "Verrouiller la position",
+        "setAutostart": "Lancer avec Windows",
         "setAlpha": "Opacité (de {min} à {max} %)",
         "setMiniMaxi": "Mode mini/maxi",
         "mini": "Mini",
@@ -521,6 +598,20 @@ TEXTE: dict[str, dict[str, str]] = {
         "setZeitraum": "Periodo per barre e subtotale",
         "setZusatz": "Blocco extra sotto le barre",
         "setBalken": "Al massimo tante barre",
+        "balkenAlle": "tutte",
+        "mBalken": "Numero di barre",
+        "setNullen": "Mostra anche le voci a 0",
+        "setDicht": "Barre su una riga (risparmia spazio)",
+        "setZusatzZeilen": "Righe nel blocco extra",
+        "setGroesse": "Dimensione",
+        "grKlein": "piccola",
+        "grNormal": "normale",
+        "grGross": "grande",
+        "grSehrGross": "molto grande",
+        "setVerhalten": "Comportamento",
+        "setVordergrund": "Sempre in primo piano",
+        "setSperren": "Blocca la posizione",
+        "setAutostart": "Avvia con Windows",
         "setAlpha": "Opacità (da {min} a {max} %)",
         "setMiniMaxi": "Modalità mini/maxi",
         "mini": "Mini",
@@ -583,6 +674,20 @@ TEXTE: dict[str, dict[str, str]] = {
         "setZeitraum": "Periode voor balken en subtotaal",
         "setZusatz": "Extra blok onder de balken",
         "setBalken": "Hoogstens zoveel balken",
+        "balkenAlle": "alle",
+        "mBalken": "Aantal balken",
+        "setNullen": "Ook items met 0 tonen",
+        "setDicht": "Balken op één regel (bespaart ruimte)",
+        "setZusatzZeilen": "Regels in het extra blok",
+        "setGroesse": "Grootte",
+        "grKlein": "klein",
+        "grNormal": "normaal",
+        "grGross": "groot",
+        "grSehrGross": "heel groot",
+        "setVerhalten": "Gedrag",
+        "setVordergrund": "Altijd op de voorgrond",
+        "setSperren": "Positie vergrendelen",
+        "setAutostart": "Met Windows starten",
         "setAlpha": "Dekking ({min} tot {max} %)",
         "setMiniMaxi": "Mini-/maximodus",
         "mini": "Mini",
@@ -645,6 +750,20 @@ TEXTE: dict[str, dict[str, str]] = {
         "setZeitraum": "Okres dla pasków i sumy częściowej",
         "setZusatz": "Dodatkowy blok pod paskami",
         "setBalken": "Najwyżej tyle pasków",
+        "balkenAlle": "wszystkie",
+        "mBalken": "Liczba pasków",
+        "setNullen": "Pokazuj też pozycje z 0",
+        "setDicht": "Paski w jednym wierszu (oszczędza miejsce)",
+        "setZusatzZeilen": "Wiersze w dodatkowym bloku",
+        "setGroesse": "Rozmiar",
+        "grKlein": "mały",
+        "grNormal": "normalny",
+        "grGross": "duży",
+        "grSehrGross": "bardzo duży",
+        "setVerhalten": "Zachowanie",
+        "setVordergrund": "Zawsze na wierzchu",
+        "setSperren": "Zablokuj położenie",
+        "setAutostart": "Uruchamiaj z systemem Windows",
         "setAlpha": "Krycie (od {min} do {max} %)",
         "setMiniMaxi": "Tryb mini/maxi",
         "mini": "Mini",
@@ -707,6 +826,20 @@ TEXTE: dict[str, dict[str, str]] = {
         "setZeitraum": "Período para as barras e o subtotal",
         "setZusatz": "Bloco extra abaixo das barras",
         "setBalken": "No máximo esta quantidade de barras",
+        "balkenAlle": "todas",
+        "mBalken": "Número de barras",
+        "setNullen": "Mostrar também entradas com 0",
+        "setDicht": "Barras numa linha (poupa espaço)",
+        "setZusatzZeilen": "Linhas no bloco extra",
+        "setGroesse": "Tamanho",
+        "grKlein": "pequeno",
+        "grNormal": "normal",
+        "grGross": "grande",
+        "grSehrGross": "muito grande",
+        "setVerhalten": "Comportamento",
+        "setVordergrund": "Sempre em primeiro plano",
+        "setSperren": "Bloquear posição",
+        "setAutostart": "Iniciar com o Windows",
         "setAlpha": "Opacidade (de {min} a {max} %)",
         "setMiniMaxi": "Modo mini/maxi",
         "mini": "Mini",
@@ -769,6 +902,20 @@ TEXTE: dict[str, dict[str, str]] = {
         "setZeitraum": "Çubuklar ve ara toplam için zaman aralığı",
         "setZusatz": "Çubukların altındaki ek blok",
         "setBalken": "En fazla bu kadar çubuk",
+        "balkenAlle": "tümü",
+        "mBalken": "Çubuk sayısı",
+        "setNullen": "0 olan girişleri de göster",
+        "setDicht": "Çubuklar tek satırda (yer kazandırır)",
+        "setZusatzZeilen": "Ek bloktaki satırlar",
+        "setGroesse": "Boyut",
+        "grKlein": "küçük",
+        "grNormal": "normal",
+        "grGross": "büyük",
+        "grSehrGross": "çok büyük",
+        "setVerhalten": "Davranış",
+        "setVordergrund": "Her zaman üstte",
+        "setSperren": "Konumu kilitle",
+        "setAutostart": "Windows ile başlat",
         "setAlpha": "Opaklık (%{min} ile %{max} arası)",
         "setMiniMaxi": "Mini/maksi modu",
         "mini": "Mini",
@@ -831,6 +978,20 @@ TEXTE: dict[str, dict[str, str]] = {
         "setZeitraum": "Период для полос и промежуточной суммы",
         "setZusatz": "Дополнительный блок под полосами",
         "setBalken": "Не больше стольких полос",
+        "balkenAlle": "все",
+        "mBalken": "Количество полос",
+        "setNullen": "Показывать и записи с 0",
+        "setDicht": "Полосы в одну строку (экономит место)",
+        "setZusatzZeilen": "Строк в дополнительном блоке",
+        "setGroesse": "Размер",
+        "grKlein": "маленький",
+        "grNormal": "обычный",
+        "grGross": "большой",
+        "grSehrGross": "очень большой",
+        "setVerhalten": "Поведение",
+        "setVordergrund": "Поверх всех окон",
+        "setSperren": "Закрепить положение",
+        "setAutostart": "Запускать вместе с Windows",
         "setAlpha": "Непрозрачность (от {min} до {max} %)",
         "setMiniMaxi": "Режим мини/макси",
         "mini": "Мини",
@@ -893,6 +1054,20 @@ TEXTE: dict[str, dict[str, str]] = {
         "setZeitraum": "बार और उप-योग के लिए समय अवधि",
         "setZusatz": "बार के नीचे अतिरिक्त ब्लॉक",
         "setBalken": "अधिकतम इतने बार",
+        "balkenAlle": "सभी",
+        "mBalken": "बार की संख्या",
+        "setNullen": "0 वाली प्रविष्टियाँ भी दिखाएँ",
+        "setDicht": "बार एक ही पंक्ति में (जगह बचती है)",
+        "setZusatzZeilen": "अतिरिक्त ब्लॉक में पंक्तियाँ",
+        "setGroesse": "आकार",
+        "grKlein": "छोटा",
+        "grNormal": "सामान्य",
+        "grGross": "बड़ा",
+        "grSehrGross": "बहुत बड़ा",
+        "setVerhalten": "व्यवहार",
+        "setVordergrund": "हमेशा सबसे ऊपर",
+        "setSperren": "जगह लॉक करें",
+        "setAutostart": "Windows के साथ शुरू करें",
         "setAlpha": "अपारदर्शिता ({min} से {max} %)",
         "setMiniMaxi": "मिनी/मैक्सी मोड",
         "mini": "मिनी",
@@ -955,6 +1130,20 @@ TEXTE: dict[str, dict[str, str]] = {
         "setZeitraum": "条形图和小计的时间范围",
         "setZusatz": "条形图下方的附加区块",
         "setBalken": "最多显示多少条",
+        "balkenAlle": "全部",
+        "mBalken": "条形数量",
+        "setNullen": "也显示为 0 的条目",
+        "setDicht": "条形单行显示（节省空间）",
+        "setZusatzZeilen": "附加区块的行数",
+        "setGroesse": "大小",
+        "grKlein": "小",
+        "grNormal": "正常",
+        "grGross": "大",
+        "grSehrGross": "特大",
+        "setVerhalten": "行为",
+        "setVordergrund": "始终置顶",
+        "setSperren": "锁定位置",
+        "setAutostart": "随 Windows 启动",
         "setAlpha": "不透明度（{min} 到 {max} %）",
         "setMiniMaxi": "迷你/完整模式",
         "mini": "迷你",
@@ -1017,6 +1206,20 @@ TEXTE: dict[str, dict[str, str]] = {
         "setZeitraum": "バーと小計の期間",
         "setZusatz": "バーの下の追加ブロック",
         "setBalken": "バーの最大数",
+        "balkenAlle": "すべて",
+        "mBalken": "バーの数",
+        "setNullen": "0 の項目も表示",
+        "setDicht": "バーを1行で表示（省スペース）",
+        "setZusatzZeilen": "追加ブロックの行数",
+        "setGroesse": "サイズ",
+        "grKlein": "小",
+        "grNormal": "標準",
+        "grGross": "大",
+        "grSehrGross": "特大",
+        "setVerhalten": "動作",
+        "setVordergrund": "常に手前に表示",
+        "setSperren": "位置を固定",
+        "setAutostart": "Windows と一緒に起動",
         "setAlpha": "不透明度（{min}〜{max} %）",
         "setMiniMaxi": "ミニ/マキシ表示",
         "mini": "ミニ",
@@ -1079,6 +1282,20 @@ TEXTE: dict[str, dict[str, str]] = {
         "setZeitraum": "막대와 소계의 기간",
         "setZusatz": "막대 아래 추가 블록",
         "setBalken": "최대 막대 수",
+        "balkenAlle": "모두",
+        "mBalken": "막대 수",
+        "setNullen": "0인 항목도 표시",
+        "setDicht": "막대를 한 줄로 (공간 절약)",
+        "setZusatzZeilen": "추가 블록의 줄 수",
+        "setGroesse": "크기",
+        "grKlein": "작게",
+        "grNormal": "보통",
+        "grGross": "크게",
+        "grSehrGross": "아주 크게",
+        "setVerhalten": "동작",
+        "setVordergrund": "항상 위에 표시",
+        "setSperren": "위치 고정",
+        "setAutostart": "Windows와 함께 시작",
         "setAlpha": "불투명도 ({min}~{max} %)",
         "setMiniMaxi": "미니/맥시 모드",
         "mini": "미니",
@@ -1147,6 +1364,56 @@ def dauer_name(sek: int | None) -> str:
 
 def theme_anzeige(name: str) -> str:
     return tx(THEME_TEXT[name]) if name in THEME_TEXT else name
+
+
+def balken_name(n: int) -> str:
+    return tx("balkenAlle") if n <= 0 else str(n)
+
+
+def groesse_name(prozent: int) -> str:
+    return tx(next((n for p, n in GROESSEN if p == prozent), "grNormal"))
+
+
+# ------------------------------ Autostart -----------------------------------
+
+
+def autostart_befehl() -> str:
+    """So startet Windows den Ticker bei der Anmeldung: die Exe selbst, als
+    Skript über pythonw (ohne Konsolenfenster)."""
+    if getattr(sys, "frozen", False):
+        return f'"{os.path.abspath(sys.executable)}"'
+    pyw = os.path.join(os.path.dirname(sys.executable), "pythonw.exe")
+    if not os.path.exists(pyw):
+        pyw = sys.executable
+    return f'"{pyw}" "{os.path.abspath(__file__)}"'
+
+
+def autostart_lesen() -> str | None:
+    """Der eingetragene Befehl oder None. Ohne winreg (kein Windows) None."""
+    try:
+        import winreg
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, AUTOSTART_SCHLUESSEL) as k:
+            return winreg.QueryValueEx(k, AUTOSTART_NAME)[0]
+    except (ImportError, OSError):
+        return None
+
+
+def autostart_setzen(an: bool) -> bool:
+    """Trägt den Ticker ein oder aus. True, wenn es geklappt hat."""
+    try:
+        import winreg
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, AUTOSTART_SCHLUESSEL, 0,
+                            winreg.KEY_SET_VALUE) as k:
+            if an:
+                winreg.SetValueEx(k, AUTOSTART_NAME, 0, winreg.REG_SZ, autostart_befehl())
+            else:
+                try:
+                    winreg.DeleteValue(k, AUTOSTART_NAME)
+                except FileNotFoundError:
+                    pass
+        return True
+    except (ImportError, OSError):
+        return False
 
 # ------------------------------ Config --------------------------------------
 
@@ -1810,12 +2077,19 @@ def _hitliste(hits) -> list[dict]:
     return [h for h in hits or [] if isinstance(h, dict)]
 
 
-def auswerten_hits(hits, max_balken: int) -> list[dict]:
+def _kappen(reihen: list[dict], max_balken: int) -> list[dict]:
+    """Sortiert nach Zahl, dann Name; max_balken 0 heißt alle."""
+    reihen.sort(key=lambda r: (-r["count"], r["label"].casefold()))
+    return reihen if max_balken <= 0 else reihen[:max_balken]
+
+
+def auswerten_hits(hits, max_balken: int, bekannt=None) -> list[dict]:
     """Zählweise Seitenbesuche: Pfadliste zu Werkzeug-Balken zusammenfassen.
 
     Ereignisse (event: true) fliegen raus, sie sind Klicks und keine
     Seiten. Zählt eine Seite beides, kämen sonst Klicks auf die Seiten-
-    besuche drauf."""
+    besuche drauf. Mit `bekannt` (der Pfadliste seit Anbeginn) bekommt
+    jedes Werkzeug einen Balken, auch mit 0 im gewählten Zeitraum."""
     summen: dict[str, int] = {}
     for hit in _hitliste(hits):
         if hit.get("event"):
@@ -1823,8 +2097,14 @@ def auswerten_hits(hits, max_balken: int) -> list[dict]:
         label = pfad_label(hit.get("path", "/"))
         summen[label] = summen.get(label, 0) + _zahl(hit.get("count"))
     reihen = [{"label": k, "count": v} for k, v in summen.items() if v > 0]
-    reihen.sort(key=lambda r: (-r["count"], r["label"]))
-    return reihen[:max_balken]
+    if bekannt is not None:
+        da = {r["label"] for r in reihen}
+        for hit in _hitliste(bekannt):
+            label = pfad_label(hit.get("path", "/"))
+            if not hit.get("event") and label not in da:
+                da.add(label)
+                reihen.append({"label": label, "count": 0})
+    return _kappen(reihen, max_balken)
 
 
 def besucher_seiten(total_payload: dict) -> int:
@@ -1852,32 +2132,48 @@ def hat_kachel_klicks(hits) -> bool:
                for h in _hitliste(hits))
 
 
-def auswerten_klicks(hits, max_balken: int) -> tuple[list[dict], int]:
+def _kachel_namen(hits, namen: dict[str, str]) -> set[str]:
+    """Trägt die Namen der Kacheln ein und liefert alle Schlüssel der Liste.
+    Die große Kachel hat Vorrang; ein Titel, der nur der Pfad ist, taugt
+    nicht als Name."""
+    schluessel: set[str] = set()
+    for hit in _hitliste(hits):
+        if not ist_kachel_klick(hit):
+            continue
+        pfad = (hit.get("path") or "").strip().lstrip("/")
+        key = kachel_schluessel(pfad)
+        schluessel.add(key)
+        titel = (hit.get("title") or "").strip()
+        if titel and titel != pfad and (key not in namen
+                                        or pfad == KACHEL_PRAEFIX + key):
+            namen[key] = titel
+    return schluessel
+
+
+def auswerten_klicks(hits, max_balken: int, bekannt=None) -> tuple[list[dict], int]:
     """Zählweise Kachel-Klicks: (Balken je Werkzeug, Summe aller Kacheln).
 
     Große Kachel und Mini-Kacheln eines Werkzeugs landen im selben
     Balken. Die Beschriftung ist der Titel, den die Seite mitschickt
     (der Werkzeugname auf der Kachel), ersatzweise der Schlüssel. Die
     Summe zählt alle Kacheln, auch die, die nicht mehr als Balken
-    hineinpassen."""
+    hineinpassen. Mit `bekannt` (der Liste seit Anbeginn) bekommt jede
+    Kachel, die je geklickt wurde, einen Balken, auch mit 0."""
     summen: dict[str, int] = {}
     namen: dict[str, str] = {}
+    alle_keys: set[str] = set()
+    if bekannt is not None:
+        alle_keys = _kachel_namen(bekannt, namen)
+    _kachel_namen(hits, namen)
     for hit in _hitliste(hits):
-        if not ist_kachel_klick(hit):
-            continue
-        pfad = (hit.get("path") or "").strip().lstrip("/")
-        key = kachel_schluessel(pfad)
-        summen[key] = summen.get(key, 0) + _zahl(hit.get("count"))
-        titel = (hit.get("title") or "").strip()
-        # Die große Kachel hat Vorrang; ein Titel, der nur der Pfad ist,
-        # taugt nicht als Name.
-        if titel and titel != pfad and (key not in namen
-                                        or pfad == KACHEL_PRAEFIX + key):
-            namen[key] = titel
+        if ist_kachel_klick(hit):
+            key = kachel_schluessel(hit.get("path", ""))
+            summen[key] = summen.get(key, 0) + _zahl(hit.get("count"))
     reihen = [{"label": namen.get(k, k), "count": v}
               for k, v in summen.items() if v > 0]
-    reihen.sort(key=lambda r: (-r["count"], r["label"]))
-    return reihen[:max_balken], sum(summen.values())
+    for key in alle_keys - {k for k, v in summen.items() if v > 0}:
+        reihen.append({"label": namen.get(key, key), "count": 0})
+    return _kappen(reihen, max_balken), sum(summen.values())
 
 
 def auswerten_stats(payload: dict, max_zeilen: int = 4,
@@ -1941,10 +2237,25 @@ class TickerApp:
         self.zusatz = self.cfg.get("zusatz", DEFAULT_ZUSATZ)
         if self.zusatz not in [k for k, _, _ in ZUSATZ_CHOICES]:
             self.zusatz = DEFAULT_ZUSATZ
-        self.max_balken = int(self.cfg.get("max_balken", DEFAULT_MAX_BALKEN))
+        self.max_balken = max(0, _zahl(self.cfg.get("max_balken", DEFAULT_MAX_BALKEN)))
         self.zaehlart = self.cfg.get("zaehlart", DEFAULT_ZAEHLART)
         if self.zaehlart not in [k for k, _ in ZAEHLARTEN]:
             self.zaehlart = DEFAULT_ZAEHLART
+        self.nullen = bool(self.cfg.get("nullen", False))
+        self.zusatz_zeilen = _zahl(self.cfg.get("zusatz_zeilen", DEFAULT_ZUSATZ_ZEILEN))
+        if self.zusatz_zeilen not in ZUSATZ_ZEILEN_CHOICES:
+            self.zusatz_zeilen = DEFAULT_ZUSATZ_ZEILEN
+        self.groesse = _zahl(self.cfg.get("groesse", DEFAULT_GROESSE))
+        if self.groesse not in [p for p, _ in GROESSEN]:
+            self.groesse = DEFAULT_GROESSE
+        self.dicht = bool(self.cfg.get("dicht", False))
+        self.vordergrund = bool(self.cfg.get("vordergrund", True))
+        self.gesperrt = bool(self.cfg.get("gesperrt", False))
+        # Liegt die Exe inzwischen woanders, zeigt der Autostart sonst ins Leere.
+        if getattr(sys, "frozen", False):
+            eintrag = autostart_lesen()
+            if eintrag is not None and eintrag != autostart_befehl():
+                autostart_setzen(True)
 
         self.api = GoatCounterAPI(self.cfg["site"], self.cfg["api_token"])
         self.ui_queue: queue.Queue = queue.Queue()
@@ -2000,13 +2311,18 @@ class TickerApp:
     def zaehlart_name(self) -> str:
         return tx(next((n for k, n in ZAEHLARTEN if k == self.zaehlart), "artAuto"))
 
+    def _schrift(self, pt: int, fett: bool = False) -> tuple:
+        """Segoe UI in der eingestellten Größe."""
+        groesse = max(6, round(pt * self.groesse / 100))
+        return ("Segoe UI", groesse, "bold") if fett else ("Segoe UI", groesse)
+
     # ---------- UI ----------
 
     def _build_ui(self):
         self.root = tk.Tk()
         self.root.title(tx("titel"))
         self.root.overrideredirect(True)
-        self.root.attributes("-topmost", True)
+        self.root.attributes("-topmost", self.vordergrund)
         self.root.attributes("-alpha", self.alpha_pct / 100.0)
         self.root.configure(bg=self.th["bg"])
 
@@ -2023,7 +2339,7 @@ class TickerApp:
 
         self.title_lbl = tk.Label(self.frame, text=tx("titel"),
                                   fg=self.th["title"], bg=self.th["bg"],
-                                  font=("Segoe UI", 9, "bold"))
+                                  font=self._schrift(9, True))
         self.title_lbl.pack(anchor="w")
 
         self.body = tk.Frame(self.frame, bg=self.th["bg"])
@@ -2031,7 +2347,7 @@ class TickerApp:
 
         self.status_lbl = tk.Label(self.frame, text=tx("lade"),
                                    fg=self.th["muted"], bg=self.th["bg"],
-                                   font=("Segoe UI", 8))
+                                   font=self._schrift(8))
         self.status_lbl.pack(anchor="w")
 
         self._bind_drag_recursive(self.root)
@@ -2053,7 +2369,7 @@ class TickerApp:
             p = tk.Toplevel(self.root)
             p.withdraw()
             p.overrideredirect(True)
-            p.attributes("-topmost", True)
+            p.attributes("-topmost", self.vordergrund)
             p.configure(bg=self.th["bg"])
             p.update_idletasks()
             self._platte_hwnd = schicht_vorbereiten(p.winfo_id())
@@ -2103,10 +2419,21 @@ class TickerApp:
             self._bind_drag_recursive(child)
 
     def _drag_start(self, event):
+        if not self.vordergrund:
+            # Ohne "immer im Vordergrund" holt ein Klick die Anzeige samt
+            # Platte nach vorn, die Platte zuerst, damit sie dahinter bleibt.
+            if self.platte:
+                self.platte.lift()
+            self.root.lift()
+        if self.gesperrt:
+            self._drag_off = None
+            return
         self._drag_off = (event.x_root - self.root.winfo_x(),
                           event.y_root - self.root.winfo_y())
 
     def _drag_move(self, event):
+        if self.gesperrt or getattr(self, "_drag_off", None) is None:
+            return
         ox, oy = getattr(self, "_drag_off", (0, 0))
         x, y = event.x_root - ox, event.y_root - oy
         self.root.geometry(f"+{x}+{y}")
@@ -2116,12 +2443,32 @@ class TickerApp:
         self.cfg["pos_x"], self.cfg["pos_y"] = x, y
 
     def _drag_end(self, _event=None):
+        if self.gesperrt:
+            return
         x, y = clamp_to_screen(int(self.cfg.get("pos_x", 60)),
                                int(self.cfg.get("pos_y", 60)))
         if (x, y) != (self.cfg.get("pos_x"), self.cfg.get("pos_y")):
             self.root.geometry(f"+{x}+{y}")
             self.cfg["pos_x"], self.cfg["pos_y"] = x, y
         save_config(self.cfg)
+
+    def _im_bild_halten(self):
+        """Wächst die Anzeige (viele Balken, große Schrift) über den unteren
+        Bildschirmrand, rutscht sie hoch, bis sie passt; höher als der
+        Bildschirm: oben bündig. Gespeichert wird das nicht, damit die
+        gewählte Stelle zurückkommt, sobald die Anzeige wieder kürzer ist."""
+        if not self.visible:
+            return
+        try:
+            self.root.update_idletasks()
+            x, y = int(self.cfg.get("pos_x", 60)), int(self.cfg.get("pos_y", 60))
+            h = self.root.winfo_height()
+            _, vy, _, vh = virtual_screen()
+            neu_y = max(vy, vy + vh - h) if y + h > vy + vh else y
+            if (x, neu_y) != (self.root.winfo_x(), self.root.winfo_y()):
+                self.root.geometry(f"+{x}+{neu_y}")
+        except tk.TclError:
+            pass
 
     def _center_overlay(self):
         vx, vy, vw, vh = virtual_screen()
@@ -2162,8 +2509,8 @@ class TickerApp:
         self.root.configure(bg=t["bg"])
         self.frame.configure(bg=t["bg"])
         self.body.configure(bg=t["bg"])
-        self.title_lbl.configure(fg=t["title"], bg=t["bg"])
-        self.status_lbl.configure(fg=t["muted"], bg=t["bg"])
+        self.title_lbl.configure(fg=t["title"], bg=t["bg"], font=self._schrift(9, True))
+        self.status_lbl.configure(fg=t["muted"], bg=t["bg"], font=self._schrift(8))
         self._render()
         self._platte_folgen()
 
@@ -2193,10 +2540,10 @@ class TickerApp:
         if self.compact:
             tk.Label(self.body, text=zahl_kurz(zeitraum_total),
                      fg=t["big"], bg=t["bg"],
-                     font=("Segoe UI", 16, "bold")).pack(anchor="w")
+                     font=self._schrift(16, True)).pack(anchor="w")
             tk.Label(self.body, text=f"{gross} · {self.zeitraum_name(zr_daten)}",
                      fg=t["muted"], bg=t["bg"],
-                     font=("Segoe UI", 8)).pack(anchor="w")
+                     font=self._schrift(8)).pack(anchor="w")
             self._bind_drag_recursive(self.root)
             return
 
@@ -2207,58 +2554,84 @@ class TickerApp:
         kopf = tk.Frame(self.body, bg=t["bg"])
         kopf.pack(fill="x", pady=(2, 0))
         tk.Label(kopf, text=zahl_kurz(zeitraum_total), fg=t["big"], bg=t["bg"],
-                 font=("Segoe UI", 18, "bold")).pack(side="left")
+                 font=self._schrift(18, True)).pack(side="left")
         rechts = tk.Frame(kopf, bg=t["bg"])
         rechts.pack(side="right", anchor="s")
         tk.Label(rechts, text=f"{gross} · {self.zeitraum_name(zr_daten)}",
                  fg=t["muted"], bg=t["bg"],
-                 font=("Segoe UI", 8)).pack(anchor="e")
+                 font=self._schrift(8)).pack(anchor="e")
         if zr_daten != "heute":
             tk.Label(rechts, text=tx("heuteN", n=zahl_kurz(heute)),
                      fg=t["text"], bg=t["bg"],
-                     font=("Segoe UI", 9, "bold")).pack(anchor="e")
+                     font=self._schrift(9, True)).pack(anchor="e")
         if gesamt is not None:
             tk.Label(rechts, text=tx("gesamtN", n=zahl_kurz(gesamt)),
                      fg=t["text"], bg=t["bg"],
-                     font=("Segoe UI", 9, "bold")).pack(anchor="e")
+                     font=self._schrift(9, True)).pack(anchor="e")
 
         # --- Balken je Werkzeug ---
         balken = self.daten.get("balken") or []
         if balken:
             tk.Label(self.body, text=tx("jeKachel" if klicks else "jeWerkzeug"),
                      fg=t["muted"], bg=t["bg"],
-                     font=("Segoe UI", 8)).pack(anchor="w", pady=(6, 0))
+                     font=self._schrift(8)).pack(anchor="w", pady=(6, 0))
             hoechst = max(b["count"] for b in balken) or 1
+            bar_w = round(BAR_W * self.groesse / 100)
+            bar_h = max(4, round(BAR_H * self.groesse / 100))
+            if self.dicht:
+                # Einzeilig: Name, Balken, Zahl nebeneinander. Halb so hoch,
+                # damit auch "alle" auf einen Bildschirm passt.
+                tabelle = tk.Frame(self.body, bg=t["bg"])
+                tabelle.pack(fill="x", pady=(2, 0))
+                tabelle.columnconfigure(1, weight=1)
+                schmal = round(DICHT_BAR_W * self.groesse / 100)
+                for i, b in enumerate(balken):
+                    name = anzeige(b["label"])
+                    if len(name) > DICHT_NAME_MAX:
+                        name = name[:DICHT_NAME_MAX - 1] + "…"
+                    tk.Label(tabelle, text=name, fg=t["text"], bg=t["bg"],
+                             font=self._schrift(8)).grid(row=i, column=0, sticky="w")
+                    rinne = tk.Frame(tabelle, bg=t["bar_bg"], width=schmal, height=bar_h)
+                    rinne.grid(row=i, column=1, sticky="we", padx=(6, 6))
+                    rinne.pack_propagate(False)
+                    fill_w = int(schmal * b["count"] / hoechst) if b["count"] else 0
+                    if fill_w:
+                        tk.Frame(rinne, bg=t["bar"], width=max(2, fill_w),
+                                 height=bar_h).place(x=0, y=0)
+                    tk.Label(tabelle, text=zahl_kurz(b["count"]), fg=t["text"], bg=t["bg"],
+                             font=self._schrift(8, True)).grid(row=i, column=2, sticky="e")
+                balken = []                     # schon gezeichnet
             for b in balken:
                 row = tk.Frame(self.body, bg=t["bg"])
                 row.pack(fill="x", pady=(3, 0))
                 head = tk.Frame(row, bg=t["bg"])
                 head.pack(fill="x")
                 tk.Label(head, text=anzeige(b["label"]), fg=t["text"], bg=t["bg"],
-                         font=("Segoe UI", 9)).pack(side="left")
+                         font=self._schrift(9)).pack(side="left")
                 tk.Label(head, text=zahl_kurz(b["count"]), fg=t["text"],
                          bg=t["bg"],
-                         font=("Segoe UI", 9, "bold")).pack(side="right")
-                bar_bg = tk.Frame(row, bg=t["bar_bg"], width=BAR_W, height=BAR_H)
+                         font=self._schrift(9, True)).pack(side="right")
+                bar_bg = tk.Frame(row, bg=t["bar_bg"], width=bar_w, height=bar_h)
                 bar_bg.pack(fill="x", pady=(1, 0))
                 bar_bg.pack_propagate(False)
-                fill_w = max(2, int(BAR_W * b["count"] / hoechst))
-                tk.Frame(bar_bg, bg=t["bar"], width=fill_w,
-                         height=BAR_H).place(x=0, y=0)
+                fill_w = int(bar_w * b["count"] / hoechst) if b["count"] else 0
+                if fill_w:                  # bei 0 bleibt die Rinne leer
+                    tk.Frame(bar_bg, bg=t["bar"], width=max(2, fill_w),
+                             height=bar_h).place(x=0, y=0)
 
         # --- Zusatzblock ---
         zusatz = self.daten.get("zusatz") or []
         if zusatz and self.zusatz_page():
             tk.Label(self.body, text=self.zusatz_name(), fg=t["muted"],
-                     bg=t["bg"], font=("Segoe UI", 8)).pack(anchor="w",
+                     bg=t["bg"], font=self._schrift(8)).pack(anchor="w",
                                                             pady=(6, 0))
             for z in zusatz:
                 row = tk.Frame(self.body, bg=t["bg"])
                 row.pack(fill="x")
                 tk.Label(row, text=anzeige(z["label"])[:22], fg=t["text"], bg=t["bg"],
-                         font=("Segoe UI", 8)).pack(side="left")
+                         font=self._schrift(8)).pack(side="left")
                 tk.Label(row, text=zahl_kurz(z["count"]), fg=t["muted"],
-                         bg=t["bg"], font=("Segoe UI", 8)).pack(side="right")
+                         bg=t["bg"], font=self._schrift(8)).pack(side="right")
 
         self._bind_drag_recursive(self.root)
 
@@ -2306,6 +2679,14 @@ class TickerApp:
                 radio=True)
             for key, name in ZAEHLARTEN
         ])
+        balken_menu = pystray.Menu(*[
+            pystray.MenuItem(
+                balken_name(n),
+                (lambda k: (lambda *_: self.ui_queue.put(("balken", k))))(n),
+                checked=(lambda k: (lambda _i: self.max_balken == k))(n),
+                radio=True)
+            for n in MAX_BALKEN_CHOICES
+        ])
         sprachen_menu = pystray.Menu(*[
             pystray.MenuItem(
                 TEXTE[code]["_name"],
@@ -2322,6 +2703,20 @@ class TickerApp:
             pystray.MenuItem(tx("mZeitraum"), zeitraum_menu),
             pystray.MenuItem(tx("mZusatz"), zusatz_menu),
             pystray.MenuItem(tx("mZaehlart"), zaehlart_menu),
+            pystray.MenuItem(tx("mBalken"), balken_menu),
+            pystray.MenuItem(tx("setNullen"),
+                             lambda *_: self.ui_queue.put(("nullen", None)),
+                             checked=lambda _i: self.nullen),
+            pystray.MenuItem(tx("setDicht"),
+                             lambda *_: self.ui_queue.put(("dicht", None)),
+                             checked=lambda _i: self.dicht),
+            pystray.Menu.SEPARATOR,
+            pystray.MenuItem(tx("setVordergrund"),
+                             lambda *_: self.ui_queue.put(("vordergrund", None)),
+                             checked=lambda _i: self.vordergrund),
+            pystray.MenuItem(tx("setSperren"),
+                             lambda *_: self.ui_queue.put(("sperren", None)),
+                             checked=lambda _i: self.gesperrt),
             pystray.Menu.SEPARATOR,
             pystray.MenuItem(tx("mEinstellungen"), self._tray_settings),
             pystray.MenuItem(tx("mTheme"), self._tray_next_theme),
@@ -2377,11 +2772,6 @@ class TickerApp:
         win.geometry(f"+{self.root.winfo_x() + 40}+{self.root.winfo_y() + 40}")
         titelleiste_dunkel(win)
 
-        def lbl(text, row, pady=(8, 2)):
-            tk.Label(win, text=text, fg=t["title"], bg=t["bg"],
-                     font=("Segoe UI", 9, "bold")).grid(
-                row=row, column=0, columnspan=2, sticky="w", pady=pady)
-
         style = ttk.Style(win)
         try:
             style.theme_use("clam")
@@ -2411,25 +2801,113 @@ class TickerApp:
                 + [tx(n) for _, n, _ in ZEITRAEUME + ZUSATZ_CHOICES]
                 + [tx(n) for _, n in ZAEHLARTEN]
                 + [dauer_name(s) for s in COMPACT_DURATIONS]
-                + [theme_anzeige(n) for n in THEME_NAMES])
-        breite = max(30, -(-max(schrift.measure(w) for w in alle)
+                + [theme_anzeige(n) for n in THEME_NAMES]
+                + [balken_name(n) for n in MAX_BALKEN_CHOICES]
+                + [tx(n) for _, n in GROESSEN])
+        breite = max(24, -(-max(schrift.measure(w) for w in alle)
                            // schrift.measure("0")) + 1)
 
-        # --- Update-Frequenz ---
-        lbl(tx("setFreq"), 0, pady=(0, 2))
-        self._refresh_var = tk.StringVar()
+        # Zwei Spalten: links, was angezeigt wird, rechts, wie es aussieht
+        # und sich verhält. Untereinander wäre das Fenster höher als
+        # mancher Bildschirm.
+        links = tk.Frame(win, bg=t["bg"])
+        links.grid(row=0, column=0, sticky="nw", padx=(0, 18))
+        rechts = tk.Frame(win, bg=t["bg"])
+        rechts.grid(row=0, column=1, sticky="nw")
+        zeilen = {links: 0, rechts: 0}
+
+        def platz(spalte):
+            zeilen[spalte] += 1
+            return zeilen[spalte] - 1
+
+        def lbl(spalte, text, pady=(8, 2)):
+            tk.Label(spalte, text=text, fg=t["title"], bg=t["bg"],
+                     font=("Segoe UI", 9, "bold")).grid(
+                row=platz(spalte), column=0, sticky="w",
+                pady=(0, 2) if zeilen[spalte] == 1 else pady)
+
+        def hinweis(spalte, text):
+            tk.Label(spalte, text=text, fg=t["muted"], bg=t["bg"],
+                     font=("Segoe UI", 8), justify="left").grid(
+                row=platz(spalte), column=0, sticky="w")
+
+        def auswahl(spalte, wert, werte, bei_wahl):
+            var = tk.StringVar(value=wert)
+            cb = ttk.Combobox(spalte, textvariable=var, values=werte,
+                              state="readonly", width=breite)
+            cb.grid(row=platz(spalte), column=0, sticky="we")
+            cb.bind("<<ComboboxSelected>>", lambda _e: bei_wahl(var.get()))
+            return var
+
+        def haken(spalte, text, wert, bei_wahl):
+            var = tk.BooleanVar(value=wert)
+            tk.Checkbutton(spalte, text=text, variable=var,
+                           command=lambda: bei_wahl(bool(var.get())),
+                           fg=t["text"], bg=t["bg"], selectcolor=t["bar_bg"],
+                           activebackground=t["bg"], activeforeground=t["title"],
+                           highlightthickness=0, font=("Segoe UI", 9),
+                           anchor="w").grid(row=platz(spalte), column=0, sticky="w")
+            return var
+
+        # ===== Links: was angezeigt wird =====
+
+        lbl(links, tx("setZeitraum"))
+
+        def on_zr(sel):
+            for key, name, _ in ZEITRAEUME:
+                if tx(name) == sel:
+                    self._set_zeitraum(key)
+                    break
+        auswahl(links, self.zeitraum_name(), [tx(n) for _, n, _ in ZEITRAEUME], on_zr)
+
+        lbl(links, tx("setZaehlart"))
+
+        def on_art(sel):
+            for key, name in ZAEHLARTEN:
+                if tx(name) == sel:
+                    self._set_zaehlart(key)
+                    break
+        auswahl(links, self.zaehlart_name(), [tx(n) for _, n in ZAEHLARTEN], on_art)
+
+        lbl(links, tx("setBalken"))
+
+        def on_bal(sel):
+            for n in MAX_BALKEN_CHOICES:
+                if balken_name(n) == sel:
+                    self._set_balken(n)
+                    break
+        self._bal_var = auswahl(links, balken_name(self.max_balken),
+                                [balken_name(n) for n in MAX_BALKEN_CHOICES], on_bal)
+        self._nullen_var = haken(links, tx("setNullen"), self.nullen, self._set_nullen)
+        self._dicht_var = haken(links, tx("setDicht"), self.dicht, self._set_dicht)
+
+        lbl(links, tx("setZusatz"))
+
+        def on_zus(sel):
+            for key, name, _ in ZUSATZ_CHOICES:
+                if tx(name) == sel:
+                    self._set_zusatz(key)
+                    break
+        auswahl(links, self.zusatz_name(), [tx(n) for _, n, _ in ZUSATZ_CHOICES], on_zus)
+
+        lbl(links, tx("setZusatzZeilen"))
+
+        def on_zeilen(sel):
+            if sel.isdigit() and int(sel) in ZUSATZ_ZEILEN_CHOICES:
+                self.zusatz_zeilen = int(sel)
+                self.cfg["zusatz_zeilen"] = self.zusatz_zeilen
+                save_config(self.cfg)
+                self.wake_event.set()
+        auswahl(links, str(self.zusatz_zeilen),
+                [str(n) for n in ZUSATZ_ZEILEN_CHOICES], on_zeilen)
+
+        lbl(links, tx("setFreq"))
         current_label = next(
             (refresh_name(sec) for sec in REFRESH_CHOICES
              if abs(sec - self.refresh_seconds) < 0.01),
             f"{self.refresh_seconds:g} s")
-        self._refresh_var.set(current_label)
-        cb_refresh = ttk.Combobox(win, textvariable=self._refresh_var,
-                                  values=[refresh_name(s) for s in REFRESH_CHOICES],
-                                  state="readonly", width=breite)
-        cb_refresh.grid(row=1, column=0, columnspan=2, sticky="we")
 
-        def on_refresh(_e=None):
-            sel = self._refresh_var.get()
+        def on_refresh(sel):
             for sec in REFRESH_CHOICES:
                 if refresh_name(sec) == sel:
                     self.refresh_seconds = float(sec)
@@ -2437,80 +2915,21 @@ class TickerApp:
                     save_config(self.cfg)
                     self.wake_event.set()
                     break
-        cb_refresh.bind("<<ComboboxSelected>>", on_refresh)
+        auswahl(links, current_label, [refresh_name(s) for s in REFRESH_CHOICES], on_refresh)
+        hinweis(links, tx("setFreqHinweis"))
 
-        tk.Label(win, text=tx("setFreqHinweis"),
-                 fg=t["muted"], bg=t["bg"], font=("Segoe UI", 8),
-                 justify="left").grid(row=2, column=0, columnspan=2, sticky="w")
+        # ===== Rechts: wie es aussieht und sich verhält =====
 
-        # --- Zeitraum ---
-        lbl(tx("setZeitraum"), 3)
-        self._zr_var = tk.StringVar(value=self.zeitraum_name())
-        cb_zr = ttk.Combobox(win, textvariable=self._zr_var,
-                             values=[tx(n) for _, n, _ in ZEITRAEUME],
-                             state="readonly", width=breite)
-        cb_zr.grid(row=4, column=0, columnspan=2, sticky="we")
+        lbl(rechts, tx("setGroesse"))
 
-        def on_zr(_e=None):
-            sel = self._zr_var.get()
-            for key, name, _ in ZEITRAEUME:
-                if tx(name) == sel:
-                    self._set_zeitraum(key)
+        def on_groesse(sel):
+            for p, n in GROESSEN:
+                if tx(n) == sel:
+                    self._set_groesse(p)
                     break
-        cb_zr.bind("<<ComboboxSelected>>", on_zr)
+        auswahl(rechts, groesse_name(self.groesse), [tx(n) for _, n in GROESSEN], on_groesse)
 
-        # --- Zusatzblock ---
-        lbl(tx("setZusatz"), 5)
-        self._zus_var = tk.StringVar(value=self.zusatz_name())
-        cb_zus = ttk.Combobox(win, textvariable=self._zus_var,
-                              values=[tx(n) for _, n, _ in ZUSATZ_CHOICES],
-                              state="readonly", width=breite)
-        cb_zus.grid(row=6, column=0, columnspan=2, sticky="we")
-
-        def on_zus(_e=None):
-            sel = self._zus_var.get()
-            for key, name, _ in ZUSATZ_CHOICES:
-                if tx(name) == sel:
-                    self._set_zusatz(key)
-                    break
-        cb_zus.bind("<<ComboboxSelected>>", on_zus)
-
-        # --- Zählweise ---
-        lbl(tx("setZaehlart"), 7)
-        self._art_var = tk.StringVar(value=self.zaehlart_name())
-        cb_art = ttk.Combobox(win, textvariable=self._art_var,
-                              values=[tx(n) for _, n in ZAEHLARTEN],
-                              state="readonly", width=breite)
-        cb_art.grid(row=8, column=0, columnspan=2, sticky="we")
-
-        def on_art(_e=None):
-            sel = self._art_var.get()
-            for key, name in ZAEHLARTEN:
-                if tx(name) == sel:
-                    self._set_zaehlart(key)
-                    break
-        cb_art.bind("<<ComboboxSelected>>", on_art)
-
-        # --- Anzahl Balken ---
-        lbl(tx("setBalken"), 9)
-        self._bal_var = tk.StringVar(value=str(self.max_balken))
-        cb_bal = ttk.Combobox(win, textvariable=self._bal_var,
-                              values=[str(n) for n in MAX_BALKEN_CHOICES],
-                              state="readonly", width=breite)
-        cb_bal.grid(row=10, column=0, columnspan=2, sticky="we")
-
-        def on_bal(_e=None):
-            try:
-                self.max_balken = int(self._bal_var.get())
-            except ValueError:
-                return
-            self.cfg["max_balken"] = self.max_balken
-            save_config(self.cfg)
-            self.wake_event.set()
-        cb_bal.bind("<<ComboboxSelected>>", on_bal)
-
-        # --- Transparenz ---
-        lbl(tx("setAlpha", min=ALPHA_MIN, max=ALPHA_MAX), 11)
+        lbl(rechts, tx("setAlpha", min=ALPHA_MIN, max=ALPHA_MAX))
         self._alpha_var = tk.IntVar(value=self.alpha_pct)
 
         def on_alpha(_v=None):
@@ -2520,51 +2939,13 @@ class TickerApp:
             self.cfg["alpha_pct"] = self.alpha_pct
             save_config(self.cfg)
 
-        tk.Scale(win, from_=ALPHA_MIN, to=ALPHA_MAX, orient="horizontal",
+        tk.Scale(rechts, from_=ALPHA_MIN, to=ALPHA_MAX, orient="horizontal",
                  variable=self._alpha_var, command=on_alpha, bg=t["bg"],
                  fg=t["text"], troughcolor=t["bar_bg"], highlightthickness=0,
                  activebackground=t["bar"],
-                 length=230).grid(row=12, column=0, columnspan=2, sticky="we")
+                 length=230).grid(row=platz(rechts), column=0, sticky="we")
 
-        # --- Mini-/Maxi-Modus ---
-        lbl(tx("setMiniMaxi"), 13)
-        btn_frame = tk.Frame(win, bg=t["bg"])
-        btn_frame.grid(row=14, column=0, columnspan=2, sticky="w")
-        tk.Button(btn_frame, text=tx("mini"), width=8,
-                  command=lambda: self._set_compact(True, from_user=True),
-                  **knopf_farben(t)).pack(side="left", padx=(0, 6))
-        tk.Button(btn_frame, text=tx("maxi"), width=8,
-                  command=lambda: self._set_compact(False, from_user=True),
-                  **knopf_farben(t)).pack(side="left")
-
-        tk.Label(win, text=tx("setZurueck"), fg=t["text"],
-                 bg=t["bg"], font=("Segoe UI", 8)).grid(
-            row=15, column=0, columnspan=2, sticky="w", pady=(6, 2))
-        self._dur_var = tk.StringVar(
-            value=dauer_name(self.compact_duration
-                             if self.compact_duration in COMPACT_DURATIONS else None))
-        cb_dur = ttk.Combobox(win, textvariable=self._dur_var,
-                              values=[dauer_name(s) for s in COMPACT_DURATIONS],
-                              state="readonly", width=breite)
-        cb_dur.grid(row=16, column=0, columnspan=2, sticky="we")
-
-        def on_dur(_e=None):
-            sel = self._dur_var.get()
-            for sec in COMPACT_DURATIONS:
-                if dauer_name(sec) == sel:
-                    self.compact_duration = sec
-                    self.cfg["compact_duration"] = sec
-                    save_config(self.cfg)
-                    break
-        cb_dur.bind("<<ComboboxSelected>>", on_dur)
-
-        # --- Theme ---
-        lbl(tx("setFarben", n=len(THEME_NAMES)), 17)
-        self._theme_var = tk.StringVar(value=theme_anzeige(self.theme_name))
-        cb_theme = ttk.Combobox(win, textvariable=self._theme_var,
-                                values=[theme_anzeige(n) for n in THEME_NAMES],
-                                state="readonly", width=breite)
-        cb_theme.grid(row=18, column=0, columnspan=2, sticky="we")
+        lbl(rechts, tx("setFarben", n=len(THEME_NAMES)))
 
         def set_theme(name: str):
             if name in THEMES:
@@ -2578,18 +2959,52 @@ class TickerApp:
                 win.destroy()
                 self.settings_win = None
                 self._open_settings()
+        auswahl(rechts, theme_anzeige(self.theme_name),
+                [theme_anzeige(n) for n in THEME_NAMES],
+                lambda sel: set_theme(next((n for n in THEME_NAMES
+                                            if theme_anzeige(n) == sel), "")))
 
-        cb_theme.bind("<<ComboboxSelected>>",
-                      lambda _e: set_theme(next(
-                          (n for n in THEME_NAMES
-                           if theme_anzeige(n) == self._theme_var.get()), "")))
+        lbl(rechts, tx("setMiniMaxi"))
+        btn_frame = tk.Frame(rechts, bg=t["bg"])
+        btn_frame.grid(row=platz(rechts), column=0, sticky="w")
+        tk.Button(btn_frame, text=tx("mini"), width=8,
+                  command=lambda: self._set_compact(True, from_user=True),
+                  **knopf_farben(t)).pack(side="left", padx=(0, 6))
+        tk.Button(btn_frame, text=tx("maxi"), width=8,
+                  command=lambda: self._set_compact(False, from_user=True),
+                  **knopf_farben(t)).pack(side="left")
+        tk.Label(rechts, text=tx("setZurueck"), fg=t["text"],
+                 bg=t["bg"], font=("Segoe UI", 8)).grid(
+            row=platz(rechts), column=0, sticky="w", pady=(6, 2))
 
-        tk.Button(win, text=tx("schliessen"), command=win.destroy, width=12,
-                  **knopf_farben(t)).grid(row=19, column=0, columnspan=2, pady=(12, 0))
+        def on_dur(sel):
+            for sec in COMPACT_DURATIONS:
+                if dauer_name(sec) == sel:
+                    self.compact_duration = sec
+                    self.cfg["compact_duration"] = sec
+                    save_config(self.cfg)
+                    break
+        auswahl(rechts, dauer_name(self.compact_duration
+                                   if self.compact_duration in COMPACT_DURATIONS else None),
+                [dauer_name(s) for s in COMPACT_DURATIONS], on_dur)
+
+        lbl(rechts, tx("setVerhalten"))
+        self._vg_var = haken(rechts, tx("setVordergrund"), self.vordergrund,
+                             self._set_vordergrund)
+        self._sp_var = haken(rechts, tx("setSperren"), self.gesperrt, self._set_gesperrt)
+        auto_var = None
+
+        def on_auto(an: bool):
+            if not autostart_setzen(an) and auto_var is not None:
+                auto_var.set(autostart_lesen() is not None)
+        auto_var = haken(rechts, tx("setAutostart"), autostart_lesen() is not None, on_auto)
+
+        tk.Button(win, text=tx("schliessen"), command=lambda: on_close(), width=12,
+                  **knopf_farben(t)).grid(row=1, column=0, columnspan=2, pady=(14, 0))
 
         tk.Label(win, text="© 2026 Dennis_mit_2n", fg=t["muted"], bg=t["bg"],
                  font=("Segoe UI", 8)).grid(
-            row=20, column=0, columnspan=2, pady=(6, 0))
+            row=2, column=0, columnspan=2, pady=(6, 0))
 
         def on_close():
             self.settings_win = None
@@ -2618,6 +3033,64 @@ class TickerApp:
         save_config(self.cfg)
         self._alltime_wert = None           # Gesamtsumme gehört zur Zählweise
         self.wake_event.set()
+
+    def _var_setzen(self, name: str, wert):
+        """Hält das offene Einstellungsfenster in Gleichklang mit dem Tray."""
+        var = getattr(self, name, None)
+        if var is not None:
+            try:
+                var.set(wert)
+            except tk.TclError:
+                pass
+
+    def _set_balken(self, n: int):
+        self.max_balken = max(0, int(n))
+        self.cfg["max_balken"] = self.max_balken
+        save_config(self.cfg)
+        self._var_setzen("_bal_var", balken_name(self.max_balken))
+        self.wake_event.set()
+
+    def _set_nullen(self, an: bool):
+        self.nullen = bool(an)
+        self.cfg["nullen"] = self.nullen
+        save_config(self.cfg)
+        self._var_setzen("_nullen_var", self.nullen)
+        self.wake_event.set()
+
+    def _set_dicht(self, an: bool):
+        self.dicht = bool(an)
+        self.cfg["dicht"] = self.dicht
+        save_config(self.cfg)
+        self._var_setzen("_dicht_var", self.dicht)
+        self._render()
+        self.root.after(50, self._im_bild_halten)
+
+    def _set_groesse(self, prozent: int):
+        self.groesse = prozent
+        self.cfg["groesse"] = prozent
+        save_config(self.cfg)
+        self.apply_theme()                  # Schrift und Balken neu
+        self.root.after(50, self._im_bild_halten)
+
+    def _set_vordergrund(self, an: bool):
+        self.vordergrund = bool(an)
+        self.cfg["vordergrund"] = self.vordergrund
+        save_config(self.cfg)
+        try:
+            if self.platte:
+                self.platte.attributes("-topmost", self.vordergrund)
+                self.platte.lift()
+            self.root.attributes("-topmost", self.vordergrund)
+            self.root.lift()
+        except tk.TclError:
+            pass
+        self._var_setzen("_vg_var", self.vordergrund)
+
+    def _set_gesperrt(self, an: bool):
+        self.gesperrt = bool(an)
+        self.cfg["gesperrt"] = self.gesperrt
+        save_config(self.cfg)
+        self._var_setzen("_sp_var", self.gesperrt)
 
     def _next_theme(self):
         idx = (THEME_NAMES.index(self.theme_name) + 1) % len(THEME_NAMES)
@@ -2684,32 +3157,45 @@ class TickerApp:
             jetzt = datetime.now().astimezone()
             zeitraum = self.zeitraum           # einmal lesen: die Oberfläche
             max_balken = self.max_balken       # darf sie währenddessen ändern
+            nullen = getattr(self, "nullen", False)
+            zeilen = getattr(self, "zusatz_zeilen", DEFAULT_ZUSATZ_ZEILEN)
             heute_start, heute_ende = zeitfenster("heute", jetzt)
             zr_start, zr_ende = zeitfenster(zeitraum, jetzt)
             art = self._zaehlart_wirksam(heute_ende)
 
             if art == "klicks":
-                balken, heute_total = auswerten_klicks(
-                    self.api.hits_alle(heute_start, heute_ende), max_balken)
+                heute_hits = self.api.hits_alle(heute_start, heute_ende)
+                heute_total = auswerten_klicks(heute_hits, 1)[1]
                 if zeitraum == "heute":
-                    zeitraum_total = heute_total
+                    zr_hits = heute_hits
                 elif zeitraum == "gesamt":
-                    balken, zeitraum_total = auswerten_klicks(
-                        self._alltime_hits_holen(heute_ende, frisch=True),
-                        max_balken)
+                    zr_hits = self._alltime_hits_holen(heute_ende, frisch=True)
                 else:
-                    balken, zeitraum_total = auswerten_klicks(
-                        self.api.hits_alle(zr_start, zr_ende), max_balken)
-                gesamt = auswerten_klicks(
-                    self._alltime_hits_holen(heute_ende), 1)[1]
+                    zr_hits = self.api.hits_alle(zr_start, zr_ende)
+                # Die Liste seit Anbeginn kennt jede Kachel, die je geklickt
+                # wurde: daraus kommen die Nullen.
+                alle_hits = self._alltime_hits_holen(heute_ende)
+                balken, zeitraum_total = auswerten_klicks(
+                    zr_hits, max_balken, alle_hits if nullen else None)
+                gesamt = auswerten_klicks(alle_hits, 1)[1]
             else:
                 heute_total = besucher_seiten(self.api.total(heute_start, heute_ende))
                 if zeitraum == "heute":
                     zeitraum_total = heute_total
                 else:
                     zeitraum_total = besucher_seiten(self.api.total(zr_start, zr_ende))
-                balken = auswerten_hits(self.api.hits(zr_start, zr_ende, limit=100),
-                                        max_balken)
+                # Bei "alle" reicht die erste Seite mit 100 Pfaden nicht.
+                if max_balken <= 0:
+                    zr_liste = self.api.hits_alle(zr_start, zr_ende)
+                else:
+                    zr_liste = self.api.hits(zr_start, zr_ende, limit=100)
+                bekannt = None
+                if nullen:
+                    try:
+                        bekannt = self._alltime_hits_holen(heute_ende)
+                    except (requests.RequestException, ValueError, LookupError):
+                        bekannt = None          # dann eben ohne Nullen
+                balken = auswerten_hits(zr_liste, max_balken, bekannt)
                 gesamt = self._gesamt_holen(heute_ende)
 
             zusatz = []
@@ -2717,7 +3203,8 @@ class TickerApp:
             if page:
                 try:
                     zusatz = auswerten_stats(
-                        self.api.seite(page, zr_start, zr_ende, limit=10),
+                        self.api.seite(page, zr_start, zr_ende, limit=max(10, zeilen)),
+                        max_zeilen=zeilen,
                         leer_label=("(direkt)" if page == "toprefs"
                                     else "(unbekannt)"))
                 except LookupError:
@@ -2820,6 +3307,7 @@ class TickerApp:
                         text=tx("aktualisiert", zeit=datetime.now().strftime("%H:%M:%S")),
                         fg=self.th["muted"])
                     self._render()
+                    self.root.after(50, self._im_bild_halten)
                     if self.icon:
                         self.icon.icon = self._tray_image()
                 elif kind == "net_error":
@@ -2847,6 +3335,16 @@ class TickerApp:
                     self._set_zusatz(payload)
                 elif kind == "zaehlart":
                     self._set_zaehlart(payload)
+                elif kind == "balken":
+                    self._set_balken(payload)
+                elif kind == "nullen":
+                    self._set_nullen(not self.nullen)
+                elif kind == "dicht":
+                    self._set_dicht(not self.dicht)
+                elif kind == "vordergrund":
+                    self._set_vordergrund(not self.vordergrund)
+                elif kind == "sperren":
+                    self._set_gesperrt(not self.gesperrt)
                 elif kind == "toggle":
                     self._toggle_visible()
                 elif kind == "center":
@@ -2878,7 +3376,7 @@ class TickerApp:
         self.visible = not self.visible
         if self.visible:
             self.root.deiconify()
-            self.root.attributes("-topmost", True)
+            self.root.attributes("-topmost", self.vordergrund)
             self._platte_stand = None
             self.root.after(30, self._platte_folgen)
         else:
@@ -3071,6 +3569,44 @@ def selbsttest() -> int:
     d = a5.ui_queue.get_nowait()[1]
     pruefe("durchlauf seiten", (d["art"], d["heute"], d["gesamt"], d["balken"]),
            ("seiten", 0, 50, []))
+    a6 = _app(_ZeitAPI(alt + neu, neu[1:]), art="klicks")
+    a6.nullen, a6.max_balken = True, 0
+    a6._refresh_once()
+    d = a6.ui_queue.get_nowait()[1]
+    pruefe("durchlauf nullen", (d["zeitraum_total"], d["gesamt"],
+                                [(b["label"], b["count"]) for b in d["balken"]]),
+           (1, 7, [("WiFi QR Card", 1), ("Real_RAM_cooler", 0)]))
+    a7 = _app(_ZeitAPI(alt + neu, alt[:1]), art="seiten")
+    a7.nullen, a7.max_balken = True, 0
+    a7._refresh_once()
+    d = a7.ui_queue.get_nowait()[1]
+    pruefe("durchlauf seiten alle", [(b["label"], b["count"]) for b in d["balken"]],
+           [("Startseite", 50)])
+
+    # 1.4.0: "alle" (0) schneidet nichts ab, Nullen aus der Liste seit Anbeginn.
+    pruefe("alle seiten", len(auswerten_hits(viele, 0)), 19)
+    pruefe("alle klicks", auswerten_klicks(klicks, 0), auswerten_klicks(klicks, 8))
+    nb = auswerten_hits({"hits": [{"path": "/wifi-qr/", "count": 3, "event": False}]}, 0,
+                        bekannt=[{"path": "/", "count": 5, "event": False},
+                                 {"path": "/bigday/", "count": 1, "event": False},
+                                 {"path": "kachel-ram", "count": 9, "event": True}])
+    pruefe("nullen seiten", [(b["label"], b["count"]) for b in nb],
+           [("wifi-qr", 3), ("bigday", 0), ("Startseite", 0)])
+    pruefe("nullen grenze", len(auswerten_hits({"hits": []}, 2, bekannt=viele)), 2)
+    kn, ks = auswerten_klicks([{"path": "kachel-wifi", "count": 2, "event": True,
+                                "title": "WiFi QR Card"}], 0, bekannt=klicks)
+    pruefe("nullen klicks", [(b["label"], b["count"]) for b in kn],
+           [("WiFi QR Card", 2), ("bigday", 0), ("Leer", 0), ("Real_RAM_cooler", 0)])
+    pruefe("nullen summe", ks, 2)
+    pruefe("balken name", (balken_name(0), balken_name(8)), ("alle", "8"))
+    pruefe("groesse name", groesse_name(140), "sehr groß")
+    pruefe("autostart befehl", autostart_befehl().endswith('besucher_ticker.py"')
+           or getattr(sys, "frozen", False), True)
+    sk = TickerApp.__new__(TickerApp)
+    sk.groesse = 140
+    pruefe("schrift gross", sk._schrift(9, True), ("Segoe UI", 13, "bold"))
+    sk.groesse = 90
+    pruefe("schrift klein", sk._schrift(8), ("Segoe UI", 7))
 
     # Zusatzliste
     stats = {"stats": [{"name": "Germany", "count": 4},

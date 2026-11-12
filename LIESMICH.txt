@@ -1,21 +1,21 @@
-Besucher-Ticker v1.3.0
+Besucher-Ticker v1.4.0
 ====================
 Overlay fuer die eigenen GoatCounter-Zahlen. Schwarz, pinke Schrift,
 blaue Balken.
 
 Voraussetzung: eine eigene Webseite, die mit GoatCounter zaehlt
-(https://www.goatcounter.com). Der Ticker zaehlt selbst nichts —
+(https://www.goatcounter.com). Der Ticker zaehlt selbst nichts,
 er zeigt an, was dein GoatCounter-Konto schon weiss.
 
 
-ERSTER START — in drei Schritten
---------------------------------
+ERSTER START IN DREI SCHRITTEN
+------------------------------
 
 1. API-Token anlegen
    Auf der eigenen GoatCounter-Seite anmelden (deinname.goatcounter.com),
    oben rechts auf den Benutzernamen klicken, dann "API" waehlen und
-   "Add new token". Name frei waehlbar. Es genuegt das Haeckchen bei
-   "Read statistics" — mehr Rechte braucht der Ticker nicht, und
+   "Add new token". Name frei waehlbar. Es genuegt das Haekchen bei
+   "Read statistics". Mehr Rechte braucht der Ticker nicht, und
    weniger Rechte koennen auch weniger Schaden anrichten, falls das
    Token je abhanden kommt.
 
@@ -23,7 +23,7 @@ ERSTER START — in drei Schritten
    Doppelklick auf BesucherTicker.exe (oder: python besucher_ticker.py).
    Beim allerersten Start fragt er zwei Dinge: die Adresse der
    GoatCounter-Seite ("deinname" genuegt) und danach das Token.
-   Beides landet in der config.json neben dem Programm — das Token
+   Beides landet in der config.json neben dem Programm, das Token
    verschluesselt, gebunden an dieses Benutzerkonto und diesen Rechner.
 
 3. Fenster zurechtruecken
@@ -36,16 +36,46 @@ BEDIENUNG
 ---------
 
 Doppelklick aufs Overlay   Mini-/Maxi-Modus umschalten
-Ziehen mit der Maus        verschieben (Position wird gemerkt)
+Ziehen mit der Maus        verschieben (Position wird gemerkt),
+                           ausser die Position ist gesperrt
 Rechtsklick aufs Tray-Symbol:
    Overlay an/aus, Overlay zur Mitte holen, Jetzt aktualisieren,
    Zeitraum (heute / 7 Tage / 30 Tage / gesamt),
    Zusatzblock (aus / Laender / Verweise),
    Zaehlweise (automatisch / Seitenbesuche / Kachel-Klicks),
+   Anzahl Balken (3 bis 20 oder alle),
+   Auch Eintraege mit 0 zeigen, Balken einzeilig,
+   Immer im Vordergrund, Position sperren,
    Einstellungen, Naechstes Theme, Zugang aendern, Sprache, Beenden
 
 Sprache: Der Ticker spricht 14 Sprachen. Ohne eigene Wahl nimmt er
 die Anzeigesprache von Windows, sonst Englisch.
+
+
+EINSTELLUNGEN
+-------------
+
+Links steht, was angezeigt wird:
+   Zeitraum, Zaehlweise, Anzahl Balken (bis "alle"),
+   Auch Eintraege mit 0 zeigen   jede Kachel bzw. Seite, die je
+                                 gezaehlt wurde, bekommt einen Balken,
+                                 auch wenn sie im Zeitraum 0 hat
+   Balken einzeilig              Name, Balken und Zahl in einer Zeile,
+                                 halb so hoch; damit passen auch alle
+                                 Kacheln auf einen Bildschirm
+   Zusatzblock und seine Zeilen (3 bis 10), Update-Frequenz
+
+Rechts steht, wie es aussieht und sich verhaelt:
+   Groesse (klein / normal / gross / sehr gross), Transparenz,
+   Farben, Mini-/Maxi-Modus,
+   Immer im Vordergrund, Position sperren,
+   Mit Windows starten           traegt den Ticker fuer dein
+                                 Benutzerkonto in den Autostart ein
+                                 (Registry, HKCU ... \Run), Haken weg
+                                 nimmt ihn wieder heraus
+
+Waechst das Overlay ueber den unteren Bildschirmrand, rutscht es von
+selbst so weit hoch, bis es passt.
 
 
 WAS DIE ZAHLEN BEDEUTEN
@@ -72,10 +102,9 @@ Was der Ticker zaehlt, steht im Tray-Menue unter "Zaehlweise":
    Die Balken           = je Werkzeug zusammengefasst
 
 Rechts daneben stehen zusaetzlich der heutige Wert und die Gesamtsumme.
-Die Balken zeigen nur die groessten Werkzeuge; passen alle hinein,
-ergeben sie zusammen genau die grosse Zahl.
+Mit "alle" Balken ergeben die Balken zusammen genau die grosse Zahl.
 
-"Gesamt" wird hoechstens alle 10 Minuten neu geholt — die Zahl aendert
+"Gesamt" wird hoechstens alle 10 Minuten neu geholt: Die Zahl aendert
 sich ohnehin traege, und jede Abfrage kostet eine Anfrage.
 
 
