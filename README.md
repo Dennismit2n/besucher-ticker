@@ -31,7 +31,7 @@ A website of your own that counts with GoatCounter. The ticker does not count an
 | | |
 |---|---|
 | **Page visits** | visitors per page. Click events stay out, they are not pages |
-| **Tile clicks** | only events whose name starts with `kachel-`: `kachel-ram` for a click on a tile, `kachel-ram-anleitung` for a mini tile inside it. That is how the [workshop](https://dennismit2n.github.io/) has reported clicks on its tiles since 12 November 2026, and nothing else. The bar is named after the title the page sends along |
+| **Tile clicks** | only events whose name starts with `kachel-`: `kachel-ram` for a click on a tile, `kachel-ram-anleitung` for a mini tile inside it. That is how the [workshop](https://dennismit2n.github.io/) has reported clicks on its tiles since November 12, 2026, and nothing else. The bar is named after the title the page sends along |
 | **automatic** (default) | tile clicks as soon as the site has ever reported one, page visits otherwise |
 
 The big number is the total of all pages or of all tiles. With “all” bars, together they add up to exactly that number; otherwise they show the biggest tools.
@@ -50,7 +50,7 @@ pip install pywin32        (optional, encrypts the token)
 pythonw besucher_ticker.py
 ```
 
-**On first start** the ticker asks for two things: the address of your GoatCounter site (`yourname` is enough) and an API token. You create the token on your GoatCounter site: username in the top right → **API** → **Add new token**. Ticking **Read statistics** is enough. The ticker needs no more rights, and fewer rights can do less harm should the token ever get out.
+**On first start** the ticker asks for two things: the address of your GoatCounter site (`yourname` is enough) and an API token. You create the token on your GoatCounter site: username in the top right → **API** → **Add new token**. Checking **Read statistics** is enough. The ticker needs no more rights, and fewer rights can do less harm should the token ever get out.
 
 ## Controls
 
@@ -58,7 +58,7 @@ pythonw besucher_ticker.py
 |---|---|
 | Drag | move the overlay, the position is saved when you let go (unless it is locked) |
 | Double-click | switch between small and large |
-| Right-click the tray icon | overlay on/off, bring to centre, refresh now, period, extra block, counting, number of bars, entries with 0, bars on one line, always on top, lock position, settings, themes, change access, language, quit |
+| Right-click the tray icon | overlay on/off, bring to center, refresh now, period, extra block, counting, number of bars, entries with 0, bars on one line, always on top, lock position, settings, themes, change access, language, quit |
 
 ## Settings
 
@@ -71,14 +71,14 @@ The settings window has two columns. On the left is what is shown, on the right 
 | **Bars on one line** | name, bar and number on one line, half the height. That way even all tiles fit on one screen |
 | **Rows in the extra block** | 3 to 10 countries or referrers |
 | **Size** | small, normal, large, extra large: text and bars grow with it |
-| **Opacity, colours, mini/maxi, update frequency** | as before |
+| **Opacity, colors, mini/maxi, update frequency** | as before |
 | **Always on top** | off: the overlay may slip behind other windows, a click brings it back to the front |
 | **Lock position** | the overlay can no longer be moved by accident |
-| **Start with Windows** | adds the ticker to autostart for your user account (`HKCU\…\Run`); untick it and it is gone again |
+| **Start with Windows** | adds the ticker to autostart for your user account (`HKCU\…\Run`); uncheck it and it is gone again |
 
 If the overlay grows past the bottom of the screen, it moves up by itself until it fits.
 
-Overlay gone? **Bring overlay to centre** in the menu. That happens when a second monitor was unplugged: the overlay is borderless and has no title bar to drag it back by.
+Overlay gone? **Bring overlay to center** in the menu. That happens when a second monitor was unplugged: the overlay is borderless and has no title bar to drag it back by.
 
 ## Privacy
 
